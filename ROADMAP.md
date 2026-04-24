@@ -20,10 +20,14 @@
 | `PostConfigTask` / `CopyFileEntry` types in config | ✓ DONE |
 | `substitute.ts` — variable substitution + `processCopyFiles` | ✓ DONE |
 | `postconfig.ts` — post-config runner with cross-platform shell | ✓ DONE |
+| `postconfig.ts` — baked-in defaults by project type | ✓ DONE |
 | `init.ts` — wires `post_config` into init flow | ✓ DONE |
-| `learn.ts` — store `templateRoot` in config | ⏳ TODO |
-| `copy_files` wired into `init.ts` | ⏳ TODO (blocked by templateRoot) |
-| `--skip-post-config` CLI flag in `index.ts` | ⏳ TODO |
+| `init.ts` — auto-suggest defaults if template has none | ✓ DONE |
+| `init.ts` — wire `copy_files` using `templateRoot` | ✓ DONE |
+| `learn.ts` — store `templateRoot` in config | ✓ DONE |
+| `learn.ts` — auto-detect post-config patterns | ✓ DONE |
+| `--skip-post-config` CLI flag in `index.ts` | ✓ DONE |
+| `config.yaml` example post-config block | ✓ DONE |
 | `platform.ts` — cross-platform shims | ⏳ TODO |
 | End-to-end test | ⏳ TODO |
 

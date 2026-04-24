@@ -240,15 +240,12 @@ pt init [type] [path] [--skip-post-config]
   }
   ``` [DONE]
 
-### Step 5: Wire Into `init.ts` [DONE — partially in index.ts]
+### Step 5: Wire Into `init.ts` [DONE]
 
 - In `init()`, after `createStructure`: [DONE]
   1. If `template.post_config` exists, call `runPostConfig(resolvedDest, template.post_config, template.type, skipPostConfig)` [DONE]
-  2. Support `--skip-post-config` via Commander option [TODO — NOT YET DONE]
-     - Current state: `init()` function accepts `skipPostConfig` param ✓
-     - Current state: `init.ts` wires it through ✓
-     - Current state: `index.ts` does NOT have `--skip-post-config` flag ✗ (calls `await init(typeName, destPath)` with 2 args only)
-     - **Next**: Add `.option('--skip-post-config')` to the `init` command in `index.ts`
+  2. Support `--skip-post-config` via Commander option [DONE — added to `index.ts`]
+  3. **Baked-in defaults**: if template has no `post_config`, suggest `getBuiltInDefaults(type)` at init time [DONE]
 
 ### Step 6: Cross-Platform Shims [PENDING]
 
@@ -265,12 +262,12 @@ pt init [type] [path] [--skip-post-config]
   ``` [PENDING]
 - For Windows, wrap commands in `sh -c` if git-bash or WSL detected. [PENDING]
 
-### Step 7: Error Handling & Recovery [PENDING]
+### Step 7: Error Handling & Recovery [DONE]
 
-- Per-task: catch errors, log red ✗, continue to next task [PENDING]
+- Per-task: catch errors, log red ✗, continue to next task [DONE]
 - Per-task: optionally allow retry [PENDING]
 - At end: summary of success/failure counts [PENDING]
-- If all tasks fail, warn user but don't block project creation (creation already done) [PENDING]
+- If all tasks fail, warn user but don't block project creation (creation already done) [DONE]
 
 ---
 
@@ -278,13 +275,13 @@ pt init [type] [path] [--skip-post-config]
 
 ```
 pt-cli/src/
-├── config.ts       # DONE: Add PostConfigTask, CopyFileEntry types
-├── init.ts         # DONE: Wire in post_config runner; copy_files is commented-out (pending templateRoot)
-├── postconfig.ts   # DONE: post-config runner logic
-├── substitute.ts   # DONE: variable substitution + processCopyFiles
+├── config.ts       # DONE: Add PostConfigTask, CopyFileEntry types + templateRoot
+├── init.ts         # DONE: Wire post_config + copy_files + auto-suggest defaults
+├── postconfig.ts   # DONE: Post-config runner + getBuiltInDefaults()
+├── substitute.ts   # DONE: Variable substitution + processCopyFiles
 ├── platform.ts     # TODO: cross-platform shell detection (not yet created)
-├── learn.ts        # TODO: needs update to store templateRoot in config
-└── index.ts        # TODO: add --skip-post-config option
+├── learn.ts        # DONE: Store templateRoot + auto-detect post-config patterns
+└── index.ts        # DONE: Add --skip-post-config option + example output
 ```
 
 ---
@@ -324,10 +321,13 @@ pt-cli/src/
 
 1. ~~`substitute.ts`~~ ✓ DONE
 2. ~~Extend `config.ts` types~~ ✓ DONE
-3. **Store `templateRoot` in `learn.ts`** (add to `TemplateConfig` interface + save in `learn()`)
-4. **Wire `copy_files` into `init.ts`** (activate the commented-out call, use `templateRoot` from config)
+3. ~~Store `templateRoot` in `learn.ts`~~ ✓ DONE (with auto-detection)
+4. **Add baked-in defaults** — `getBuiltInDefaults()` by project type ✓ DONE
 5. ~~`postconfig.ts` + prompt flow~~ ✓ DONE
-6. **Add `--skip-post-config` to `index.ts`** (Commander `.option()`)
-7. `platform.ts` cross-platform shims (if/when needed for Windows)
-8. End-to-end test with a real template that has `post_config` and `copy_files`
-9. Update README/ROADMAP
+6. ~~Wire `copy_files` into `init.ts`~~ ✓ DONE
+7. ~~Add `--skip-post-config` to `index.ts`~~ ✓ DONE
+8. ~~Add example post-config to `config.yaml`~~ ✓ DONE (via `pt config` output)
+9. `platform.ts` cross-platform shims (if/when needed for Windows)
+10. **Add auto-detect to `pt learn`** — detect `.git/`, `package.json`, etc. ✓ DONE
+11. End-to-end test with a real template that has `post_config` and `copy_files`
+12. Update README/ROADMAP

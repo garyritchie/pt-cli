@@ -12,7 +12,8 @@ export async function runPostConfig(
   destPath: string,
   tasks: PostConfigTask[],
   projectType: string,
-  skipPostConfig: boolean = false
+  skipPostConfig: boolean = false,
+  dryRun: boolean = false
 ): Promise<void> {
   if (skipPostConfig) return;
 
@@ -23,13 +24,20 @@ export async function runPostConfig(
     return;
   }
 
-  // 2. Ask user
-  const { run } = await inquirer.prompt({
-    type: 'confirm',
-    name: 'run',
-    message: 'Run post-config tasks?',
-    default: false
-  });
+  // 2. Ask user (skip in dryRun)
+  let run = false;
+  if (dryRun) {
+    console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
+    run = true;
+  } else {
+    const response = await inquirer.prompt({
+      type: 'confirm',
+      name: 'run',
+      message: 'Run post-config tasks?',
+      default: false
+    });
+    run = response.run;
+  }
 
   if (!run) return;
 
@@ -39,27 +47,33 @@ export async function runPostConfig(
     const progress = `[${i + 1}/${applicableTasks.length}]`;
 
     if (task.command) {
-      try {
-        console.log(chalk.yellow(`\n${progress} Running: ${task.command}`));
-        execSync(task.command, {
-          cwd: destPath,
-          stdio: 'inherit'
-        });
-        console.log(chalk.green('  ✓ Command completed successfully'));
-      } catch (err) {
-        console.log(chalk.red('  ✗ Command failed'));
+      if (dryRun) {
+        console.log(chalk.gray(`  [DRY RUN] Would run: ${task.command}`));
+      } else {
+        try {
+          console.log(chalk.yellow(`\n${progress} Running: ${task.command}`));
+          execSync(task.command, {
+            cwd: destPath,
+            stdio: 'inherit'
+          });
+          console.log(chalk.green('  ✓ Command completed successfully'));
+        } catch (err) {
+          console.log(chalk.red('  ✗ Command failed'));
+        }
       }
     }
 
     if (task.script) {
-      // For now, we'll assume scripts are executable or run with node/python
-      // In a real implementation, we'd detect the extension
-      try {
-        process.stdout.write(`${progress} ${task.script} `);
-        // Logic to run script would go here
-        console.log(chalk.yellow('(not yet implemented)'));
-      } catch (err) {
-        console.log(chalk.red('✗'));
+      if (dryRun) {
+        console.log(chalk.gray(`  [DRY RUN] Would run script: ${task.script}`));
+      } else {
+        try {
+          process.stdout.write(`${progress} ${task.script} `);
+          // Logic to run script would go here
+          console.log(chalk.yellow('(not yet implemented)'));
+        } catch (err) {
+          console.log(chalk.red('✗'));
+        }
       }
     }
   }

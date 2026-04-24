@@ -37,3 +37,4 @@ Thumbs.db
 # Tests
 coverage/
 test_*
+*-test*

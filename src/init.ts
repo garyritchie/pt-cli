@@ -58,9 +58,9 @@ export async function init(targetName: string | undefined, destPath: string | un
   }
 
   if (dryRun) {
-    console.log(chalk.yellow(`\n[DRY RUN] Initializing project "${template.name}" at: ${resolvedDest}`));
+    console.log(chalk.yellow(`\n[DRY RUN] Initializing project "${template.description}" at: ${resolvedDest}`));
   } else {
-    console.log(chalk.cyan(`\nInitializing project "${template.name}" at: ${resolvedDest}`));
+    console.log(chalk.cyan(`\nInitializing project "${template.description}" at: ${resolvedDest}`));
   }
 
   // 1. Create structure
@@ -115,7 +115,7 @@ export async function init(targetName: string | undefined, destPath: string | un
   }
   // 4. Run post-config tasks
   if (template.post_config) {
-    await runPostConfig(resolvedDest, template.post_config, template.type, skipPostConfig, dryRun);
+    await runPostConfig(resolvedDest, template.post_config, typeName!, skipPostConfig, dryRun);
   }
 
   if (dryRun) {

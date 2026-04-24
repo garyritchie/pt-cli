@@ -40,72 +40,35 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     targetName = newName;
   }
 
-  let type = '';
+  let description = '';
   if (isUpdate) {
-    const currentType = config.templates[updateTemplate].type;
-    const { changeType } = await inquirer.prompt({
+    const currentDesc = config.templates[updateTemplate].description || '';
+    const { changeDesc } = await inquirer.prompt({
       type: 'confirm',
-      name: 'changeType',
-      message: `Change type from "${currentType}"?`,
+      name: 'changeDesc',
+      message: `Change description from "${currentDesc}"?`,
       default: false
     });
     
-    if (!changeType) {
-      type = currentType;
+    if (!changeDesc) {
+      description = currentDesc;
     } else {
-      const existingTypes = Array.from(new Set(Object.values(config.templates || {}).filter(t => t && t.type).map(t => t.type)));
-      const typeChoice = await inquirer.prompt({
-        type: 'list',
-        name: 'type',
-        message: 'Select Project Type:',
-        loop: false,
-        theme: {
-          icon: {
-            cursor: chalk.green('[x] ')
-          }
-        },
-        choices: [
-          ...existingTypes.map(t => ({ name: `Use existing: ${t}`, value: t })),
-          { name: '(Create new type)', value: '__NEW__' }
-        ]
+      const { newDesc } = await inquirer.prompt({
+        type: 'input',
+        name: 'newDesc',
+        message: 'Purpose/Description of this template:',
+        default: currentDesc
       });
-      type = typeChoice.type;
-      if (type === '__NEW__') {
-        const { newTypeName } = await inquirer.prompt({
-          type: 'input',
-          name: 'newTypeName',
-          message: 'New type name:'
-        });
-        type = newTypeName;
-      }
+      description = newDesc;
     }
   } else {
-    const existingTypes = Array.from(new Set(Object.values(config.templates || {}).filter(t => t && t.type).map(t => t.type)));
-    const typeChoice = await inquirer.prompt({
-      type: 'list',
-      name: 'type',
-      message: 'Select Project Type:',
-      loop: false,
-      theme: {
-        icon: {
-          cursor: chalk.green('[x] ')
-        }
-      },
-      choices: [
-        ...existingTypes.map(t => ({ name: `Use existing: ${t}`, value: t })),
-        { name: '(Create new type)', value: '__NEW__' }
-      ]
+    const { newDesc } = await inquirer.prompt({
+      type: 'input',
+      name: 'newDesc',
+      message: 'Purpose/Description of this template:',
+      default: targetName
     });
-
-    type = typeChoice.type;
-    if (type === '__NEW__') {
-      const { newTypeName } = await inquirer.prompt({
-        type: 'input',
-        name: 'newTypeName',
-        message: 'New type name:'
-      });
-      type = newTypeName;
-    }
+    description = newDesc;
   }
 
   const cliIgnore = ignoreArgs ? ignoreArgs.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -187,8 +150,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
 
   const templateConfig: TemplateConfig = {
-    name: path.basename(resolvedPath),
-    type: type,
+    description: description,
     templateRoot: resolvedPath,
     folders: folders,
     copy_files: copy_files,

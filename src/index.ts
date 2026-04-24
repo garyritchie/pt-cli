@@ -50,6 +50,7 @@ program
     } else {
       for (const name of names) {
         const t = config.templates[name];
+        if (!t) continue;
         console.log(chalk.white(`  - ${name}`), chalk.gray(`(${t.type})`));
         if (t.templateRoot) {
           console.log(chalk.gray(`      Source: ${t.templateRoot}`));

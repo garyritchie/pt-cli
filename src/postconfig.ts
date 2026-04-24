@@ -39,19 +39,15 @@ export async function runPostConfig(
     const progress = `[${i + 1}/${applicableTasks.length}]`;
 
     if (task.command) {
-      const isWindows = process.platform === 'win32';
-      const shell = isWindows ? 'cmd' : 'sh';
-      const flag = isWindows ? '/c' : '-c';
-
       try {
-        process.stdout.write(`${progress} ${task.command} `);
-        execSync(`${shell} ${flag} "${task.command}"`, {
+        console.log(chalk.yellow(`\n${progress} Running: ${task.command}`));
+        execSync(task.command, {
           cwd: destPath,
           stdio: 'inherit'
         });
-        console.log(chalk.green('✓'));
+        console.log(chalk.green('  ✓ Command completed successfully'));
       } catch (err) {
-        console.log(chalk.red('✗'));
+        console.log(chalk.red('  ✗ Command failed'));
       }
     }
 

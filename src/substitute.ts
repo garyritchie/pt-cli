@@ -3,7 +3,7 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateConfig, PostConfigTask, CopyFileEntry } from './config';
-import { loadConfig } from './config';
+import { loadConfig, sanitizePath } from './config';
 
 /**
  * Replaces all {{var}} patterns in the content with values from the variables object.
@@ -30,7 +30,7 @@ export async function processCopyFiles(
 
   for (const copyFile of template.copy_files) {
     const srcPath = path.join(templateRoot, copyFile.src);
-    const destPath = path.join(resolvedDest, copyFile.dest);
+    const destPath = path.join(resolvedDest, sanitizePath(copyFile.dest));
 
     if (!fs.existsSync(srcPath)) {
       console.warn(chalk.yellow(`Warning: ${copyFile.src} not found in template`));

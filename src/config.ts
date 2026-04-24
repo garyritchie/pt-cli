@@ -98,36 +98,15 @@ export function getTemplateNames(config: PtConfig): string[] {
 // Default exclusions for template scanning
 export const DEFAULT_EXCLUDES = [
   '.git',
+  '.gitea',
+  '.vscode',
   'node_modules',
   'dist',
   'build',
+  'bin',
   '.DS_Store',
-  '.pytest_cache',
-  '__pycache__',
-  '.vscode',
-  '.idea',
-  '.gitkeep.md',
-  '.info.md',
-  '.vale.ini',
-  '.gitattributes',
-  '.gitconfig',
-  '.detoxrc',
-  '.markdownlint.json',
-  '.update-exclude',
+  'Thumbs.db',
   '.stignore',
-  '.editorconfig',
-  '.makerc',
-  'Gemfile',
-  'Gemfile.lock',
-  'package.json',
-  'package-lock.json',
-  'yarn.lock',
-  'pnpm-lock.yaml',
-  'composer.json',
-  'composer.lock',
-  'makefile',
-  'Makefile',
-  'nohup.out',
 ];
 
 // Check if a path should be excluded
@@ -221,6 +200,18 @@ export function shouldExcludeFile(fileName: string): boolean {
     '*.ini',
     '*.conf',
     '*.config',
+    '.editorconfig',
+    '.gitattributes',
+    '.gitconfig',
+    '.makerc',
+    'Gemfile',
+    'Gemfile.lock',
+    'package.json',
+    'package-lock.json',
+    'yarn.lock',
+    'pnpm-lock.yaml',
+    'composer.json',
+    'composer.lock',
   ];
 
   for (const pattern of excludePatterns) {
@@ -229,6 +220,8 @@ export function shouldExcludeFile(fileName: string): boolean {
       if (fileName.endsWith(ext)) {
         return true;
       }
+    } else if (fileName === pattern) {
+      return true;
     }
   }
 

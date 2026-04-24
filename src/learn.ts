@@ -131,9 +131,10 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
 
   const folders = extractStructure(resolvedPath, resolvedPath, ignorePatterns);
+  const allFiles = collectFiles(resolvedPath, resolvedPath, ignorePatterns);
   
-  if (folders.length === 0) {
-    console.log(chalk.yellow("No folders found (excluding .git, node_modules, etc)."));
+  if (folders.length === 0 && allFiles.length === 0) {
+    console.log(chalk.yellow("No folders or files found (excluding .git, node_modules, etc)."));
     return;
   }
 
@@ -142,6 +143,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     type: type,
     templateRoot: resolvedPath,    // absolute path to source directory
     folders: folders,
+    copy_files: allFiles,
     variables: variables.length > 0 ? variables : undefined
   };
 
@@ -185,6 +187,10 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     
     if (addPostCopy) {
       post_copy = detectedExecutables.map(f => ({ src: f, dest: f }));
+      // Remove these from copy_files to avoid duplication
+      if (templateConfig.copy_files) {
+        templateConfig.copy_files = templateConfig.copy_files.filter(cf => !detectedExecutables.includes(cf.src));
+      }
     }
   }
   if (post_copy) {
@@ -213,6 +219,7 @@ export function detectExecutables(sourcePath: string): string[] {
     { name: '*.bat', desc: 'batch file' },
     { name: '*.cmd', desc: 'batch file' },
     { name: 'Makefile', desc: 'makefile' },
+    { name: 'makefile', desc: 'makefile' },
     { name: '*.mk', desc: 'makefile include' },
   ];
   
@@ -239,8 +246,8 @@ export function detectExecutables(sourcePath: string): string[] {
       
       // Check by extension first
       for (const pat of executablePatterns) {
-        if (pat.name === 'Makefile') {
-          if (entry.name === 'Makefile') { desc = pat.desc; found = true; break; }
+        if (pat.name === 'Makefile' || pat.name === 'makefile') {
+          if (entry.name === pat.name) { desc = pat.desc; found = true; break; }
         } else if (pat.name === '*.mk') {
           if (entry.name.endsWith('.mk')) { desc = pat.desc; found = true; break; }
         } else {
@@ -274,6 +281,31 @@ export function detectExecutables(sourcePath: string): string[] {
   }
   
   return detected;
+}
+
+function collectFiles(dirPath: string, rootPath: string, ignorePatterns?: string[]): any[] {
+  let files: any[] = [];
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      const relativePath = path.relative(rootPath, fullPath);
+
+      if (shouldExclude(dirPath, fullPath, ignorePatterns)) continue;
+      if (shouldIgnore(entry.name, relativePath, ignorePatterns)) continue;
+
+      if (entry.isDirectory()) {
+        files = files.concat(collectFiles(fullPath, rootPath, ignorePatterns));
+      } else if (entry.isFile()) {
+        files.push({
+          src: relativePath,
+          dest: relativePath,
+          substitute_variables: true
+        });
+      }
+    }
+  } catch (e) {}
+  return files;
 }
 
 function extractStructure(dirPath: string, rootPath: string, ignorePatterns?: string[]): FolderNode[] {

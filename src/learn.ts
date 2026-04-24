@@ -4,7 +4,7 @@ import inquirer from 'inquirer';
 import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames } from './config.js';
 import chalk from 'chalk';
 
-export async function learn(sourcePath: string) {
+export async function learn(sourcePath, updateTemplate = null) {
   const resolvedPath = path.resolve(sourcePath);
   
   if (!fs.existsSync(resolvedPath)) {

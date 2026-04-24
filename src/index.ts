@@ -19,6 +19,13 @@ program
   });
 
 program
+  .command('update <template>')
+  .description('Update an existing template from a directory')
+  .action(async (templateName) => {
+    await learn('.', templateName);
+  });
+
+program
   .command('init [type] [path]')
   .description('Initialize a new project from a learned template')
   .action(async (typeName, destPath) => {

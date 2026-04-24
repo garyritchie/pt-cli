@@ -121,12 +121,12 @@ export const DEFAULT_EXCLUDES = [
 export function shouldExclude(dirPath: string, fullPath: string, excludes?: string[]): boolean {
   const name = path.basename(fullPath);  // Check the entry name, not the parent dir
   const allExcludes = [...DEFAULT_EXCLUDES, ...(excludes || [])];
-  
+
   // Check if any entry is a git submodule
   if (name === '.git' && fs.existsSync(path.join(fullPath, 'modules'))) {
     return true;
   }
-  
+
   // Check for submodules in the parent
   const gitmodulesPath = path.join(fullPath, '..', '.gitmodules');
   if (fs.existsSync(gitmodulesPath)) {
@@ -140,7 +140,7 @@ export function shouldExclude(dirPath: string, fullPath: string, excludes?: stri
       // Ignore errors reading gitmodules
     }
   }
-  
+
   return allExcludes.includes(name);
 }
 
@@ -201,7 +201,7 @@ export function shouldExcludeFile(fileName: string): boolean {
     '*~',
     '.bak',
   ];
-  
+
   for (const pattern of excludePatterns) {
     if (pattern.startsWith('*')) {
       const ext = pattern.substring(1);
@@ -210,6 +210,8 @@ export function shouldExcludeFile(fileName: string): boolean {
       }
     }
   }
-  
+
   return false;
+}
+return safeSegments.join(path.sep);
 }

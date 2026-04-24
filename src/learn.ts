@@ -224,6 +224,15 @@ export function detectExecutables(sourcePath: string): string[] {
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       
+      // Skip files that should be excluded (common data/config/doc files)
+      if (shouldExcludeFile(entry.name)) continue;
+      if (shouldExclude(sourcePath, path.join(sourcePath, entry.name))) continue;
+      
+      // Also skip dotfiles unless they match a specific pattern (like .sh)
+      if (entry.name.startsWith('.') && !entry.name.endsWith('.sh') && !entry.name.endsWith('.py')) {
+        continue;
+      }
+
       const fullPath = path.join(sourcePath, entry.name);
       let desc = '';
       let found = false;

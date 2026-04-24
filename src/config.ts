@@ -115,6 +115,19 @@ export const DEFAULT_EXCLUDES = [
   '.markdownlint.json',
   '.update-exclude',
   '.stignore',
+  '.editorconfig',
+  '.makerc',
+  'Gemfile',
+  'Gemfile.lock',
+  'package.json',
+  'package-lock.json',
+  'yarn.lock',
+  'pnpm-lock.yaml',
+  'composer.json',
+  'composer.lock',
+  'makefile',
+  'Makefile',
+  'nohup.out',
 ];
 
 // Check if a path should be excluded
@@ -200,6 +213,14 @@ export function shouldExcludeFile(fileName: string): boolean {
     '*.swo',
     '*~',
     '.bak',
+    '*.md',
+    '*.txt',
+    '*.json',
+    '*.yaml',
+    '*.yml',
+    '*.ini',
+    '*.conf',
+    '*.config',
   ];
 
   for (const pattern of excludePatterns) {

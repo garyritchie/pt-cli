@@ -43,7 +43,7 @@ const path = __importStar(require("path"));
 const inquirer_1 = __importDefault(require("inquirer"));
 const config_js_1 = require("./config.js");
 const chalk_1 = __importDefault(require("chalk"));
-async function learn(sourcePath, updateTemplate = null) {
+async function learn(sourcePath, updateTemplate = null, ignoreArgs) {
     const resolvedPath = path.resolve(sourcePath);
     if (!fs.existsSync(resolvedPath)) {
         console.error(chalk_1.default.red(`Error: Path "${sourcePath}" does not exist.`));
@@ -121,6 +121,15 @@ async function learn(sourcePath, updateTemplate = null) {
             type = newTypeName;
         }
     }
+    // Merge CLI --ignore patterns with config's ignore list
+    const cliIgnore = ignoreArgs ? ignoreArgs.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const ignorePatterns = [...(config.ignore || []), ...cliIgnore];
+    if (ignorePatterns.length > 0 && !isUpdate) {
+        console.log(chalk_1.default.cyan("\nIgnore patterns active:"));
+        for (const p of ignorePatterns) {
+            console.log(chalk_1.default.gray("  - " + p));
+        }
+    }
     const { hasVariables } = await inquirer_1.default.prompt({
         type: 'confirm',
         name: 'hasVariables',
@@ -141,7 +150,7 @@ async function learn(sourcePath, updateTemplate = null) {
             required: true
         }));
     }
-    const folders = extractStructure(resolvedPath, resolvedPath);
+    const folders = extractStructure(resolvedPath, resolvedPath, ignorePatterns);
     if (folders.length === 0) {
         console.log(chalk_1.default.yellow("No folders found (excluding .git, node_modules, etc)."));
         return;
@@ -258,18 +267,23 @@ function detectExecutables(sourcePath) {
     }
     return detected;
 }
-function extractStructure(dirPath, rootPath) {
+function extractStructure(dirPath, rootPath, ignorePatterns) {
     let nodes = [];
     try {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });
         for (const entry of entries) {
             const fullPath = path.join(dirPath, entry.name);
+            const relativePath = path.relative(rootPath, fullPath);
+            // Check ignore patterns first
+            if (entry.isDirectory() && (0, config_js_1.shouldIgnore)(entry.name, relativePath, ignorePatterns)) {
+                continue;
+            }
             // Use shouldExclude from config instead of hardcoded list
             if ((0, config_js_1.shouldExclude)(dirPath, fullPath)) {
                 continue;
             }
             if (entry.isDirectory()) {
-                const children = extractStructure(fullPath, rootPath);
+                const children = extractStructure(fullPath, rootPath, ignorePatterns);
                 let info = "";
                 const gitkeepPath = path.join(fullPath, '.gitkeep.md');
                 const infoPath = path.join(fullPath, '.info.md');

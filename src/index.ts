@@ -14,15 +14,17 @@ program
 program
   .command('learn <path>')
   .description('Scan a directory and learn its structure as a template')
-  .action(async (pathArg) => {
-    await learn(pathArg);
+  .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
+  .action(async (pathArg, options) => {
+    await learn(pathArg, null, options.ignore);
   });
 
 program
   .command('update <template>')
   .description('Update an existing template from a directory')
-  .action(async (templateName) => {
-    await learn('.', templateName);
+  .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
+  .action(async (templateName, options) => {
+    await learn('.', templateName, options.ignore);
   });
 
 program
@@ -66,6 +68,14 @@ program
             console.log(chalk.gray(`        - ${f.src} → ${(f.dest || f.src)}`));
           }
         }
+      }
+    }
+    
+    // Show global ignore patterns
+    if (config.ignore && config.ignore.length > 0) {
+      console.log(chalk.cyan('\nIgnore Patterns (pt learn):'));
+      for (const p of config.ignore) {
+        console.log(chalk.gray(`  - ${p}`));
       }
     }
     

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldExcludeFile, PostCopyFile } from './config.js';
+import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile } from './config.js';
 import chalk from 'chalk';
 
 export interface TemplateVariable {
@@ -11,7 +11,7 @@ export interface TemplateVariable {
   required?: boolean;
 }
 
-export async function learn(sourcePath: string, updateTemplate: string | null = null): Promise<void> {
+export async function learn(sourcePath: string, updateTemplate: string | null = null, ignoreArgs?: string): Promise<void> {
   const resolvedPath = path.resolve(sourcePath);
   
   if (!fs.existsSync(resolvedPath)) {
@@ -94,6 +94,16 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     }
   }
 
+  // Merge CLI --ignore patterns with config's ignore list
+  const cliIgnore = ignoreArgs ? ignoreArgs.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const ignorePatterns = [...(config.ignore || []), ...cliIgnore];
+  if (ignorePatterns.length > 0 && !isUpdate) {
+    console.log(chalk.cyan("\nIgnore patterns active:"));
+    for (const p of ignorePatterns) {
+      console.log(chalk.gray("  - " + p));
+    }
+  }
+
   const { hasVariables } = await inquirer.prompt({
     type: 'confirm',
     name: 'hasVariables',
@@ -116,7 +126,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     }));
   }
 
-  const folders = extractStructure(resolvedPath, resolvedPath);
+  const folders = extractStructure(resolvedPath, resolvedPath, ignorePatterns);
   
   if (folders.length === 0) {
     console.log(chalk.yellow("No folders found (excluding .git, node_modules, etc)."));
@@ -240,7 +250,7 @@ export function detectExecutables(sourcePath: string): string[] {
   return detected;
 }
 
-function extractStructure(dirPath: string, rootPath: string): FolderNode[] {
+function extractStructure(dirPath: string, rootPath: string, ignorePatterns?: string[]): FolderNode[] {
   let nodes: FolderNode[] = [];
   
   try {
@@ -248,6 +258,12 @@ function extractStructure(dirPath: string, rootPath: string): FolderNode[] {
     
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
+      const relativePath = path.relative(rootPath, fullPath);
+      
+      // Check ignore patterns first
+      if (entry.isDirectory() && shouldIgnore(entry.name, relativePath, ignorePatterns)) {
+        continue;
+      }
       
       // Use shouldExclude from config instead of hardcoded list
       if (shouldExclude(dirPath, fullPath)) {
@@ -255,7 +271,7 @@ function extractStructure(dirPath: string, rootPath: string): FolderNode[] {
       }
       
       if (entry.isDirectory()) {
-        const children = extractStructure(fullPath, rootPath);
+        const children = extractStructure(fullPath, rootPath, ignorePatterns);
         let info = "";
         
         const gitkeepPath = path.join(fullPath, '.gitkeep.md');

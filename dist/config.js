@@ -6,6 +6,7 @@ exports.loadConfig = loadConfig;
 exports.saveConfig = saveConfig;
 exports.getTemplateNames = getTemplateNames;
 exports.shouldExclude = shouldExclude;
+exports.shouldIgnore = shouldIgnore;
 exports.shouldExcludeFile = shouldExcludeFile;
 const YAML = require('yaml');
 const fs = require('fs');
@@ -29,7 +30,12 @@ function loadConfig() {
         return defaultConfig;
     }
     const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-    return YAML.parse(content);
+    const config = YAML.parse(content);
+    // Initialize ignore for legacy configs that don't have it
+    if (config.ignore === undefined) {
+        config.ignore = [];
+    }
+    return config;
 }
 function saveConfig(config) {
     ensureConfigDir();
@@ -83,6 +89,34 @@ function shouldExclude(dirPath, fullPath, excludes) {
         }
     }
     return allExcludes.includes(name);
+}
+// Check if a folder should be ignored based on ignore patterns.
+// Patterns support glob-style wildcards:
+//   DAILIES/*      - ignore everything inside DAILIES (DAILIES itself is kept)
+//   DAILIES/**     - same as DAILIES/* (deep match)
+//   FOLDER         - ignore this specific folder (no wildcard)
+function shouldIgnore(folderName, relativePath, ignorePatterns) {
+    if (!ignorePatterns || ignorePatterns.length === 0)
+        return false;
+    const parts = relativePath.split(path.sep);
+    for (const pattern of ignorePatterns) {
+        // Handle wildcard patterns: "FOLDER/*" or "FOLDER/**"
+        // These match children of the named folder, NOT the folder itself
+        if (pattern.endsWith('/*') || pattern.endsWith('/**')) {
+            const suffix = pattern.endsWith('/**') ? 3 : 2;
+            const parentName = pattern.slice(0, -suffix); // "FOLDER" from "FOLDER/*"
+            // Match if the relative path has the parent as a prefix AND has more depth
+            if (parts[0] === parentName && parts.length > 1) {
+                return true;
+            }
+        }
+        // No wildcard: exact folder name match
+        else {
+            if (folderName === pattern)
+                return true;
+        }
+    }
+    return false;
 }
 // Check if a file should be excluded (e.g., .gitignore patterns)
 function shouldExcludeFile(fileName) {

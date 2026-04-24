@@ -9,8 +9,11 @@ A CLI tool for learning directory structures as templates and initializing new p
 - Define template variables for customization
 - Auto-detect and suggest post-config tasks during `pt learn`
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
-- Copy additional files from template with variable substitution
+- Copy additional files from template with variable substitution (`copy_files`)
+- Auto-detect executable scripts for `post_copy` during `pt learn`
 - Built-in file/folder exclusion patterns
+- `--skip-post-config` flag to bypass post-config prompt
+- Enhanced `pt config` output (shows templateRoot, post_config, post_copy)
 - YAML-based configuration at `~/.pt/config.yaml`
 
 ## Installation
@@ -77,7 +80,7 @@ Shows all templates, their `post_config` tasks (if any), source paths, and an ex
 Config is stored at `~/.pt/config.yaml` and contains:
 
 - `version`: Config version
-- `templates`: Dictionary of learned templates with folder structure
+- `templates`: Dictionary of learned templates with folder structure, `templateRoot`, `copy_files`, `post_copy`, and `post_config`
 
 ### Template Variables
 
@@ -212,6 +215,70 @@ Each entry supports:
 - Template root not set: skip silently (learn stores this)
 - Permission errors: caught and logged
 
+### Post-Copy
+
+Auto-detect executable scripts during `pt learn` and copy them to the new project:
+
+**Auto-detection** (`pt learn`):
+
+When learning a template, `pt` scans the source directory root for executable files:
+
+| Pattern | Description |
+|---------|-------------|
+| `*.sh` | Shell scripts |
+| `*.py` | Python scripts |
+| `*.bat` / `*.cmd` | Batch files |
+| `Makefile` | Makefiles |
+| `*.mk` | Makefile includes |
+
+The detected files are presented to the user for confirmation:
+
+```
+Auto-detected executable files:
+  - bin/deploy.sh (shell script)
+  - scripts/lint.py (Python script)
+  - Makefile (makefile)
+
+Add to post_copy? (y/N):
+```
+
+**Manual definition** in `config.yaml`:
+
+```yaml
+templates:
+  my_template:
+    name: My Project
+    post_copy:
+      - src: "bin/deploy.sh"
+        dest: "bin/deploy.sh"
+      - src: "scripts/lint.py"
+        dest: "scripts/lint.py"
+```
+
+Each entry supports:
+
+| Field | Description |
+|-------|-------------|
+| `src` | Path relative to template root (source directory from `pt learn`) |
+| `dest` | Path relative to project root (defaults to `src` if omitted) |
+
+**How it works**:
+
+1. During `pt init`, copies each `post_copy` file from `templateRoot/src` to `projectRoot/dest`
+2. Auto-applies `0755` chmod for `.sh`, `.py`, `.bash`, `.bat` files
+3. Missing files: warn and skip, don't block project creation
+
+**vs copy_files**: `post_copy` is a simplified variant specifically for executables/scripts, auto-detected by `pt learn`. `copy_files` is for arbitrary template files with variable substitution support.
+
+### Order of Operations
+
+During `pt init`:
+
+1. **Create folder structure** — folders and `.info.md` files
+2. **Copy `copy_files`** — with optional variable substitution and chmod
+3. **Copy `post_copy`** — executable scripts (auto-detected or manual)
+4. **Execute post-config tasks** — shell commands
+
 ## Development
 
 ### Build
@@ -238,13 +305,13 @@ npm run lint
 pt-cli/
 ├── bin/          # CLI entry point
 ├── src/          # TypeScript source
-│   ├── config.ts # Config management, exclusion logic, and type definitions
-│   ├── learn.ts  # Template learning logic + post-config auto-detection
-│   ├── init.ts   # Project initialization logic + copy_files wiring
-│   ├── postconfig.ts # Post-config runner + baked-in defaults
-│   ├── substitute.ts # Variable substitution + processCopyFiles
-│   ├── platform.ts # Cross-platform shell detection (TBD)
-│   └── index.ts  # CLI command definitions
+│   ├── config.ts       # Config management, exclusion logic, type definitions
+│   ├── learn.ts        # Template learning logic + templateRoot storage + executable auto-detection
+│   ├── init.ts         # Project initialization + copy_files/post_copy/post_config wiring
+│   ├── postconfig.ts   # Post-config runner + baked-in defaults
+│   ├── substitute.ts   # Variable substitution + processCopyFiles
+│   ├── platform.ts     # Cross-platform shell detection
+│   └── index.ts        # CLI command definitions
 ├── dist/         # Compiled JavaScript (generated)
 ├── package.json
 ├── tsconfig.json

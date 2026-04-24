@@ -42,6 +42,7 @@ const path = __importStar(require("path"));
 const inquirer_1 = __importDefault(require("inquirer"));
 const config_js_1 = require("./config.js");
 const chalk_1 = __importDefault(require("chalk"));
+const substitute_js_1 = require("./substitute.js");
 const postconfig_js_1 = require("./postconfig.js");
 async function init(targetName, destPath, skipPostConfig = false) {
     const config = (0, config_js_1.loadConfig)();
@@ -84,9 +85,39 @@ async function init(targetName, destPath, skipPostConfig = false) {
     // 1. Create structure
     createStructure(resolvedDest, template.folders);
     // 2. Process copy_files
-    // Note: templateRoot resolution is a pending task.
-    // await processCopyFiles('', resolvedDest, template, {}); 
-    // 3. Run post-config tasks
+    if (template.copy_files && template.templateRoot) {
+        console.log(chalk_1.default.cyan("Processing copy_files..."));
+        await (0, substitute_js_1.processCopyFiles)(template.templateRoot, resolvedDest, template, {});
+    }
+    // 3. Process post_copy (executable scripts)
+    if (template.post_copy && template.templateRoot) {
+        console.log(chalk_1.default.cyan("Processing post_copy..."));
+        for (const file of template.post_copy) {
+            const srcPath = path.join(template.templateRoot, file.src);
+            const destPath = path.join(resolvedDest, file.dest || file.src);
+            if (fs.existsSync(srcPath)) {
+                const fileContent = fs.readFileSync(srcPath, 'utf-8');
+                const destDir = path.dirname(destPath);
+                fs.mkdirSync(destDir, { recursive: true });
+                fs.writeFileSync(destPath, fileContent);
+                // Auto-chmod for executables
+                const ext = path.extname(file.src);
+                if (['.sh', '.py', '.bash', '.bat'].includes(ext)) {
+                    try {
+                        fs.chmodSync(destPath, 0o755);
+                    }
+                    catch (e) {
+                        // chmod not available (Windows)
+                    }
+                }
+                console.log(chalk_1.default.green("  ✓ " + (file.dest || file.src)));
+            }
+            else {
+                console.warn(chalk_1.default.yellow("  ! " + file.src + " not found, skipping"));
+            }
+        }
+    }
+    // 4. Run post-config tasks
     if (template.post_config) {
         await (0, postconfig_js_1.runPostConfig)(resolvedDest, template.post_config, template.type, skipPostConfig);
     }

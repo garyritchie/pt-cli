@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode } from './config.js';
+import { loadConfig, FolderNode, PostCopyFile } from './config.js';
 import chalk from 'chalk';
 import { processCopyFiles } from './substitute.js';
 import { runPostConfig } from './postconfig.js';
@@ -57,10 +57,41 @@ export async function init(targetName: string | undefined, destPath: string | un
   createStructure(resolvedDest, template.folders);
 
   // 2. Process copy_files
-  // Note: templateRoot resolution is a pending task.
-  // await processCopyFiles('', resolvedDest, template, {}); 
+  if (template.copy_files && template.templateRoot) {
+    console.log(chalk.cyan("Processing copy_files..."));
+    await processCopyFiles(template.templateRoot, resolvedDest, template, {});
+  } 
 
-  // 3. Run post-config tasks
+
+  // 3. Process post_copy (executable scripts)
+  if (template.post_copy && template.templateRoot) {
+    console.log(chalk.cyan("Processing post_copy..."));
+    for (const file of template.post_copy) {
+      const srcPath = path.join(template.templateRoot, file.src);
+      const destPath = path.join(resolvedDest, file.dest || file.src);
+      
+      if (fs.existsSync(srcPath)) {
+        const fileContent = fs.readFileSync(srcPath, 'utf-8');
+        const destDir = path.dirname(destPath);
+        fs.mkdirSync(destDir, { recursive: true });
+        fs.writeFileSync(destPath, fileContent);
+        
+        // Auto-chmod for executables
+        const ext = path.extname(file.src);
+        if (['.sh', '.py', '.bash', '.bat'].includes(ext)) {
+          try {
+            fs.chmodSync(destPath, 0o755);
+          } catch (e) {
+            // chmod not available (Windows)
+          }
+        }
+        console.log(chalk.green("  ✓ " + (file.dest || file.src)));
+      } else {
+        console.warn(chalk.yellow("  ! " + file.src + " not found, skipping"));
+      }
+    }
+  }
+  // 4. Run post-config tasks
   if (template.post_config) {
     await runPostConfig(resolvedDest, template.post_config, template.type, skipPostConfig);
   }

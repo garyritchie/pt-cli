@@ -28,8 +28,9 @@ program
 program
     .command('init [type] [path]')
     .description('Initialize a new project from a learned template')
-    .action(async (typeName, destPath) => {
-    await (0, init_js_1.init)(typeName, destPath);
+    .option('--skip-post-config', 'Skip running post-config tasks after project creation')
+    .action(async (typeName, destPath, options) => {
+    await (0, init_js_1.init)(typeName, destPath, options.skipPostConfig);
 });
 program
     .command('config')
@@ -47,7 +48,34 @@ program
         for (const name of names) {
             const t = config.templates[name];
             console.log(chalk_1.default.white(`  - ${name}`), chalk_1.default.gray(`(${t.type})`));
+            if (t.templateRoot) {
+                console.log(chalk_1.default.gray(`      Source: ${t.templateRoot}`));
+            }
+            if (t.post_config && t.post_config.length > 0) {
+                console.log(chalk_1.default.cyan('      Post-config:'));
+                for (const task of t.post_config) {
+                    const cmd = task.command || task.script || '(unknown)';
+                    const typeFilter = task.type ? ` [type: ${task.type}]` : '';
+                    console.log(chalk_1.default.gray(`        - ${cmd}${typeFilter}`));
+                }
+            }
+            if (t.post_copy && t.post_copy.length > 0) {
+                console.log(chalk_1.default.cyan('      post_copy:'));
+                for (const f of t.post_copy) {
+                    console.log(chalk_1.default.gray(`        - ${f.src} → ${(f.dest || f.src)}`));
+                }
+            }
         }
     }
+    console.log(chalk_1.default.cyan('\nExample post-config in config.yaml:'));
+    console.log(chalk_1.default.gray(`
+  my_template:
+    type: javascript
+    post_config:
+      - command: "git init"
+        description: "Initialize git repository"
+      - command: "npm install"
+        description: "Install npm dependencies"
+        type: "javascript"`));
 });
 program.parse(process.argv);

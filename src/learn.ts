@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldExcludeFile } from './config.js';
+import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldExcludeFile, PostCopyFile } from './config.js';
 import chalk from 'chalk';
 
 export interface TemplateVariable {
@@ -126,10 +126,56 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const templateConfig: TemplateConfig = {
     name: path.basename(resolvedPath),
     type: type,
+    templateRoot: resolvedPath,    // absolute path to source directory
     folders: folders,
     variables: variables.length > 0 ? variables : undefined
   };
 
+
+  // Auto-detect executable files at project root
+  const detectedExecutables = detectExecutables(resolvedPath);
+  let post_copy: PostCopyFile[] | undefined;
+  
+  if (detectedExecutables.length > 0) {
+    console.log(chalk.cyan("\nAuto-detected " + detectedExecutables.length + " executable file(s) at project root:"));
+    for (const file of detectedExecutables) {
+      // find description
+      let desc = '';
+      const patterns = [
+        { name: '*.sh', desc: 'shell script' },
+        { name: '*.py', desc: 'Python script' },
+        { name: '*.bat', desc: 'batch file' },
+        { name: '*.cmd', desc: 'batch file' },
+        { name: 'Makefile', desc: 'makefile' },
+        { name: '*.mk', desc: 'makefile include' },
+      ];
+      for (const pat of patterns) {
+        if (pat.name === 'Makefile') {
+          if (file === 'Makefile') desc = pat.desc;
+        } else if (pat.name === '*.mk') {
+          if (file.endsWith('.mk')) desc = pat.desc;
+        } else {
+          if (path.extname(file) === pat.name.substring(1)) desc = pat.desc;
+        }
+        if (desc) break;
+      }
+      console.log(chalk.gray("  - " + file + " (" + desc + ")"));
+    }
+    
+    const { addPostCopy } = await inquirer.prompt({
+      type: 'confirm',
+      name: 'addPostCopy',
+      message: 'Add these to post_copy (copied during pt init)?',
+      default: true
+    });
+    
+    if (addPostCopy) {
+      post_copy = detectedExecutables.map(f => ({ src: f, dest: f }));
+    }
+  }
+  if (post_copy) {
+    templateConfig.post_copy = post_copy;
+  }
   config.templates[targetName] = templateConfig;
   saveConfig(config);
 
@@ -139,6 +185,59 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   if (variables.length > 0) {
     console.log(chalk.gray(`  Variables: ${variables.map(v => v.name).join(', ')}`));
   }
+}
+
+
+/**
+ * Scan the root of the template directory for executable/script files.
+ * Returns filenames relative to the project root.
+ */
+export function detectExecutables(sourcePath: string): string[] {
+  const executablePatterns = [
+    { name: '*.sh', desc: 'shell script' },
+    { name: '*.py', desc: 'Python script' },
+    { name: '*.bat', desc: 'batch file' },
+    { name: '*.cmd', desc: 'batch file' },
+    { name: 'Makefile', desc: 'makefile' },
+    { name: '*.mk', desc: 'makefile include' },
+  ];
+  
+  let detected: string[] = [];
+  
+  try {
+    const entries = fs.readdirSync(sourcePath, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      
+      const fullPath = path.join(sourcePath, entry.name);
+      
+      for (const pat of executablePatterns) {
+        if (pat.name === 'Makefile') {
+          if (entry.name === 'Makefile') {
+            detected.push(entry.name);
+            break;
+          }
+        } else if (pat.name === '*.mk') {
+          if (entry.name.endsWith('.mk')) {
+            detected.push(entry.name);
+            break;
+          }
+        } else {
+          const ext = path.extname(entry.name);
+          const expectedExt = pat.name.substring(1); // remove '*'
+          if (ext === expectedExt) {
+            detected.push(entry.name);
+            break;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Skip permission errors
+  }
+  
+  return detected;
 }
 
 function extractStructure(dirPath: string, rootPath: string): FolderNode[] {

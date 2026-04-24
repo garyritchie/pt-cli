@@ -29,6 +29,11 @@ export interface CopyFileEntry {
   chmod?: string;    // e.g., "0755"
 }
 
+
+export interface PostCopyFile {
+  src: string;       // relative to templateRoot
+  dest?: string;     // relative to project root (defaults to src)
+}
 export interface TemplateConfig {
   name: string;
   type: string;
@@ -37,6 +42,7 @@ export interface TemplateConfig {
   folders: FolderNode[];
   exclude?: string[];
   copy_files?: CopyFileEntry[];
+  post_copy?: PostCopyFile[];    // auto-detected executables/scripts
   post_config?: PostConfigTask[];  // NEW
 }
 

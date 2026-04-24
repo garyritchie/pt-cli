@@ -61,6 +61,9 @@ pt update <template_name> /path/to/project
 
 # Ignore specific folders during learning
 pt learn /path/to/project --ignore=DAILIES/*,PARKING_LOT/*,REFERENCE/*
+
+# Ignore a folder name at any depth
+pt learn /path/to/project --ignore=**/.godot/
 ```
 
 ### Initialize a project

@@ -43,26 +43,27 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   let type = '';
   if (isUpdate) {
     const currentType = config.templates[updateTemplate].type;
-    const { keepType } = await inquirer.prompt({
+    const { changeType } = await inquirer.prompt({
       type: 'confirm',
-      name: 'keepType',
+      name: 'changeType',
       message: `Change type from "${currentType}"?`,
-      default: true
+      default: false
     });
     
-    if (keepType) {
+    if (!changeType) {
       type = currentType;
     } else {
       console.log(chalk.yellow('Available types (use existing or create new):'));
-      for (const name of getTemplateNames(config)) {
-        console.log(chalk.gray(`  - ${name}`));
+      const existingTypes = Array.from(new Set(Object.values(config.templates).map(t => t.type)));
+      for (const t of existingTypes) {
+        console.log(chalk.gray(`  - ${t}`));
       }
       const typeChoice = await inquirer.prompt({
         type: 'list',
         name: 'type',
         message: 'Select Project Type:',
         choices: [
-          ...existingNames.map(n => ({ name: `Use existing: ${n}`, value: n })),
+          ...existingTypes.map(t => ({ name: `Use existing: ${t}`, value: t })),
           { name: '(Create new type)', value: '__NEW__' }
         ]
       });

@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import { processCopyFiles } from './substitute.js';
 import { runPostConfig } from './postconfig.js';
 
-export async function init(targetName: string | undefined, destPath: string | undefined, skipPostConfig: boolean = false) {
+export async function init(targetName: string | undefined, destPath: string | undefined, skipPostConfig: boolean = false, dryRun: boolean = false) {
   const config = loadConfig();
 
   let typeName: string | undefined = targetName;
@@ -46,31 +46,47 @@ export async function init(targetName: string | undefined, destPath: string | un
 
   const resolvedDest = path.resolve(dest!);
 
-  if (fs.existsSync(resolvedDest)) {
+  if (fs.existsSync(resolvedDest) && !dryRun) {
     console.error(chalk.red(`Error: Destination "${resolvedDest}" already exists.`));
     process.exit(1);
   }
 
-  console.log(chalk.cyan(`\nInitializing project "${template.name}" at: ${resolvedDest}`));
+  if (dryRun) {
+    console.log(chalk.yellow(`\n[DRY RUN] Initializing project "${template.name}" at: ${resolvedDest}`));
+  } else {
+    console.log(chalk.cyan(`\nInitializing project "${template.name}" at: ${resolvedDest}`));
+  }
 
   // 1. Create structure
-  createStructure(resolvedDest, template.folders);
+  createStructure(resolvedDest, template.folders, dryRun);
 
   // 2. Process copy_files
   if (template.copy_files && template.templateRoot) {
-    console.log(chalk.cyan("Processing copy_files..."));
-    await processCopyFiles(template.templateRoot, resolvedDest, template, {});
+    if (dryRun) console.log(chalk.yellow("[DRY RUN] Processing copy_files..."));
+    else console.log(chalk.cyan("Processing copy_files..."));
+    await processCopyFiles(template.templateRoot, resolvedDest, template, {}, dryRun);
   }
 
 
   // 3. Process post_copy (executable scripts)
   if (template.post_copy && template.templateRoot) {
-    console.log(chalk.cyan("Processing post_copy..."));
+    if (dryRun) console.log(chalk.yellow("[DRY RUN] Processing post_copy..."));
+    else console.log(chalk.cyan("Processing post_copy..."));
+    
     for (const file of template.post_copy) {
       const srcPath = path.join(template.templateRoot, file.src);
       const destPath = path.join(resolvedDest, file.dest || file.src);
 
       if (fs.existsSync(srcPath)) {
+        if (dryRun) {
+          console.log(chalk.gray(`  [DRY RUN] Would copy ${file.src} → ${file.dest || file.src}`));
+          const ext = path.extname(file.src);
+          if (['.sh', '.py', '.bash', '.bat'].includes(ext)) {
+            console.log(chalk.gray(`  [DRY RUN] Would chmod +x ${file.dest || file.src}`));
+          }
+          continue;
+        }
+
         const fileContent = fs.readFileSync(srcPath, 'utf-8');
         const destDir = path.dirname(destPath);
         fs.mkdirSync(destDir, { recursive: true });
@@ -93,27 +109,40 @@ export async function init(targetName: string | undefined, destPath: string | un
   }
   // 4. Run post-config tasks
   if (template.post_config) {
-    await runPostConfig(resolvedDest, template.post_config, template.type, skipPostConfig);
+    await runPostConfig(resolvedDest, template.post_config, template.type, skipPostConfig, dryRun);
   }
 
-  console.log(chalk.green(`\n✓ Project created successfully.`));
-  console.log(chalk.gray(`  Run 'cd ${dest}' and 'git init' to get started.`));
+  if (dryRun) {
+    console.log(chalk.yellow(`\n[DRY RUN] Project initialization preview complete.`));
+  } else {
+    console.log(chalk.green(`\n✓ Project created successfully.`));
+    console.log(chalk.gray(`  Run 'cd ${dest}' and 'git init' to get started.`));
+  }
 }
 
-function createStructure(dirPath: string, folders: FolderNode[]) {
+function createStructure(dirPath: string, folders: FolderNode[], dryRun: boolean = false) {
   for (const folder of folders) {
     const fullDirPath = path.join(dirPath, folder.name);
-    fs.mkdirSync(fullDirPath, { recursive: true });
+    
+    if (dryRun) {
+      console.log(chalk.gray(`  [DRY RUN] Would create directory: ${fullDirPath}`));
+    } else {
+      fs.mkdirSync(fullDirPath, { recursive: true });
+    }
 
     // Create .info.md if content exists
     if (folder.info) {
       const infoPath = path.join(fullDirPath, '.info.md');
-      fs.writeFileSync(infoPath, folder.info);
+      if (dryRun) {
+        console.log(chalk.gray(`  [DRY RUN] Would create info file: ${infoPath}`));
+      } else {
+        fs.writeFileSync(infoPath, folder.info);
+      }
     }
 
     // Recurse children
     if (folder.children && folder.children.length > 0) {
-      createStructure(fullDirPath, folder.children);
+      createStructure(fullDirPath, folder.children, dryRun);
     }
   }
 }

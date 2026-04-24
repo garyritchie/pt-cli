@@ -30,9 +30,10 @@ program
 program
   .command('init [type] [path]')
   .description('Initialize a new project from a learned template')
-  .option('--skip-post-config', 'Skip running post-config tasks after project creation')
+  .option('--skip-post-config', 'Skip running post-config prompt')
+  .option('--dry-run', 'Show what would be created without making changes')
   .action(async (typeName, destPath, options) => {
-    await init(typeName, destPath, options.skipPostConfig);
+    await init(typeName, destPath, options.skipPostConfig, options.dryRun);
   });
 
 program

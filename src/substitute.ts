@@ -24,7 +24,8 @@ export async function processCopyFiles(
   templateRoot: string,
   resolvedDest: string,
   template: TemplateConfig,
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  dryRun: boolean = false
 ): Promise<void> {
   if (!template.copy_files) return;
 
@@ -34,6 +35,17 @@ export async function processCopyFiles(
 
     if (!fs.existsSync(srcPath)) {
       console.warn(chalk.yellow(`Warning: ${copyFile.src} not found in template`));
+      continue;
+    }
+
+    if (dryRun) {
+      console.log(chalk.gray(`  [DRY RUN] Would copy ${copyFile.src} → ${copyFile.dest}`));
+      if (copyFile.substitute_variables) {
+        console.log(chalk.gray(`  [DRY RUN] Would substitute variables in ${copyFile.dest}`));
+      }
+      if (copyFile.chmod) {
+        console.log(chalk.gray(`  [DRY RUN] Would chmod ${copyFile.chmod} ${copyFile.dest}`));
+      }
       continue;
     }
 

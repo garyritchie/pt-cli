@@ -13,6 +13,8 @@ A CLI tool for learning directory structures as templates and initializing new p
 - Auto-detect executable scripts for `post_copy` during `pt learn`
 - Built-in file/folder exclusion patterns
 - `--skip-post-config` flag to bypass post-config prompt
+- `--dry-run` flag to preview `pt init` actions without creating files
+- `pt remove` command to delete unwanted templates
 - Enhanced `pt config` output (shows templateRoot, post_config, post_copy)
 - YAML-based configuration at `~/.pt/config.yaml`
 
@@ -69,6 +71,19 @@ pt init <template_name> /path/to/new/project
 
 # Skip post-config tasks
 pt init <template_name> /path/to/new/project --skip-post-config
+
+# Dry run (preview actions without execution)
+pt init <template_name> /path/to/new/project --dry-run
+```
+
+### Remove a template
+
+```bash
+# Remove a learned template (asks for confirmation)
+pt remove <template_name>
+
+# Short alias
+pt rm <template_name>
 ```
 
 ### Show config and templates

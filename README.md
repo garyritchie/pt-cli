@@ -133,9 +133,13 @@ When learning a template, `pt` scans the source directory for common patterns an
 | `setup.py` or `pyproject.toml` | `pip install -e .`                | python      |
 | `Makefile`                     | `make init`                       | all         |
 
-**Baked-in defaults** (by project type):
+### The 80% Philosophy
 
-If a template has no `post_config` defined, `pt init` auto-suggests defaults:
+`pt` is designed to get you **80% of the way there** automatically. For complex templates, you are encouraged to:
+
+1. Use `pt learn` to capture the basic structure and key boilerplate.
+2. Manually edit `~/.pt/config.yaml` to refine `copy_files`, `post_config` commands, or add specific `chmod` requirements.
+3. Alternatively, initialize a temporary project from your learned template (`pt init`), refine it manually, and then use `pt update` from that directory to "re-learn" the refined state.
 
 ```
 javascript:  [git init, npm install]

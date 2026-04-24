@@ -12,7 +12,7 @@ const program = new commander_1.Command();
 program
     .name('pt')
     .description('Project Template CLI - Learn and initialize project structures')
-    .version('0.1.0');
+    .version(require('../package.json').version, '-v', 'output the version number');
 program
     .command('learn <path>')
     .description('Scan a directory and learn its structure as a template')

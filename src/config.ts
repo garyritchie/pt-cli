@@ -35,8 +35,7 @@ export interface PostCopyFile {
   dest?: string;     // relative to project root (defaults to src)
 }
 export interface TemplateConfig {
-  name: string;
-  type: string;
+  description: string;
   templateRoot?: string;    // path to source directory (set by `pt learn`)
   variables?: TemplateVariable[];
   folders: FolderNode[];
@@ -69,7 +68,7 @@ export function loadConfig(): PtConfig {
   ensureConfigDir();
   if (!fs.existsSync(CONFIG_PATH)) {
     const defaultConfig: PtConfig = {
-      version: '2.0',
+      version: '3.0',
       templates: {}
     };
     saveConfig(defaultConfig);
@@ -82,6 +81,24 @@ export function loadConfig(): PtConfig {
   if (config.ignore === undefined) {
     config.ignore = [];
   }
+
+  // Migration from 2.0 to 3.0
+  if (config.version === '2.0') {
+    for (const key in config.templates) {
+      const t = config.templates[key] as any;
+      if (t.name && !t.description) {
+        t.description = t.name;
+        delete t.name;
+      }
+      if (t.type) {
+        delete t.type;
+      }
+    }
+    config.version = '3.0';
+    saveConfig(config);
+    console.log(`\nConfig migrated to version 3.0 (renamed 'name' to 'description', removed 'type')`);
+  }
+
   return config;
 }
 

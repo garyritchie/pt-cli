@@ -52,7 +52,7 @@ program
       for (const name of names) {
         const t = config.templates[name];
         if (!t) continue;
-        console.log(chalk.white(`  - ${name}`), chalk.gray(`(${t.type})`));
+        console.log(chalk.white(`  - ${name}`), chalk.gray(`(${t.description})`));
         if (t.templateRoot) {
           console.log(chalk.gray(`      Source: ${t.templateRoot}`));
         }
@@ -84,7 +84,7 @@ program
     console.log(chalk.cyan('\nExample post-config in config.yaml:'));
     console.log(chalk.gray(`
   my_template:
-    type: javascript
+    description: "My standard web project"
     post_config:
       - command: "git init"
         description: "Initialize git repository"

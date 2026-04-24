@@ -139,27 +139,47 @@ export function shouldExclude(dirPath: string, fullPath: string, excludes?: stri
 // Check if a folder should be ignored based on ignore patterns.
 // Patterns support glob-style wildcards:
 //   DAILIES/*      - ignore everything inside DAILIES (DAILIES itself is kept)
-//   DAILIES/**     - same as DAILIES/* (deep match)
-//   FOLDER         - ignore this specific folder (no wildcard)
+//   DAILIES/**     - same as DAILIES/* (deep match from root)
+//   **/FOLDER/     - ignore any folder named FOLDER at any depth
+//   FOLDER         - ignore this specific folder (at root or as name)
 export function shouldIgnore(folderName: string, relativePath: string, ignorePatterns?: string[]): boolean {
   if (!ignorePatterns || ignorePatterns.length === 0) return false;
 
-  const parts = relativePath.split(path.sep);
+  // Normalize relativePath to use forward slashes for consistent pattern matching
+  const normalizedPath = relativePath.split(path.sep).join('/');
+  const parts = normalizedPath.split('/');
 
-  for (const pattern of ignorePatterns) {
-    // Handle wildcard patterns: "FOLDER/*" or "FOLDER/**"
-    // These match children of the named folder, NOT the folder itself
+  for (let pattern of ignorePatterns) {
+    // Normalize pattern slashes
+    pattern = pattern.split(/[/\\]/).join('/');
+
+    // 1. Deep match: "**/NAME" or "**/NAME/"
+    if (pattern.startsWith('**/')) {
+      let target = pattern.substring(3);
+      if (target.endsWith('/')) target = target.slice(0, -1);
+      
+      // Match if any segment of the path matches the target
+      if (parts.includes(target)) return true;
+      continue;
+    }
+
+    // 2. Wildcard children at root: "FOLDER/*" or "FOLDER/**"
+    // Matches children of the named folder, NOT the folder itself
     if (pattern.endsWith('/*') || pattern.endsWith('/**')) {
       const suffix = pattern.endsWith('/**') ? 3 : 2;
-      const parentName = pattern.slice(0, -suffix);  // "FOLDER" from "FOLDER/*"
-      // Match if the relative path has the parent as a prefix AND has more depth
+      const parentName = pattern.slice(0, -suffix);
       if (parts[0] === parentName && parts.length > 1) {
         return true;
       }
+      continue;
     }
-    // No wildcard: exact folder name match
-    else {
-      if (folderName === pattern) return true;
+
+    // 3. Exact match (name or path)
+    let cleanPattern = pattern;
+    if (cleanPattern.endsWith('/')) cleanPattern = cleanPattern.slice(0, -1);
+
+    if (folderName === cleanPattern || normalizedPath === cleanPattern) {
+      return true;
     }
   }
   return false;

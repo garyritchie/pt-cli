@@ -10,12 +10,22 @@ export interface FolderNode {
   name: string;
   info: string;
   children?: FolderNode[];
+  is_file?: boolean;
 }
 
 export interface TemplateConfig {
   name: string;
   type: string;
+  variables?: TemplateVariable[];
   folders: FolderNode[];
+  exclude?: string[];
+}
+
+export interface TemplateVariable {
+  name: string;
+  prompt: string;
+  default?: string;
+  required?: boolean;
 }
 
 export interface PtConfig {
@@ -52,4 +62,94 @@ export function saveConfig(config: PtConfig) {
 
 export function getTemplateNames(config: PtConfig): string[] {
   return Object.keys(config.templates || {});
+}
+
+// Default exclusions for template scanning
+export const DEFAULT_EXCLUDES = [
+  '.git',
+  'node_modules',
+  'dist',
+  'build',
+  '.DS_Store',
+  '.pytest_cache',
+  '__pycache__',
+  '.vscode',
+  '.idea',
+  '.gitkeep.md',
+  '.info.md',
+  '.vale.ini',
+  '.gitattributes',
+  '.gitconfig',
+  '.detoxrc',
+  '.markdownlint.json',
+  '.update-exclude',
+  '.stignore',
+];
+
+// Check if a path should be excluded
+export function shouldExclude(dirPath: string, fullPath: string, excludes?: string[]): boolean {
+  const name = path.basename(dirPath);
+  const allExcludes = [...DEFAULT_EXCLUDES, ...(excludes || [])];
+  
+  // Check if any entry is a git submodule
+  if (name === '.git' && fs.existsSync(path.join(fullPath, 'modules'))) {
+    return true;
+  }
+  
+  // Check for submodules in the parent
+  const gitmodulesPath = path.join(fullPath, '..', '.gitmodules');
+  if (fs.existsSync(gitmodulesPath)) {
+    try {
+      const gitmodules = fs.readFileSync(gitmodulesPath, 'utf-8');
+      const regex = new RegExp(`path = ${name}\\s*$`, 'm');
+      if (regex.test(gitmodules)) {
+        return true;
+      }
+    } catch (e) {
+      // Ignore errors reading gitmodules
+    }
+  }
+  
+  return allExcludes.includes(name);
+}
+
+// Check if a file should be excluded (e.g., .gitignore patterns)
+export function shouldExcludeFile(fileName: string): boolean {
+  const excludePatterns = [
+    '*.pyc',
+    '*.pyo',
+    '*.pyd',
+    '.Python',
+    '*.egg-info',
+    '*.egg',
+    '*.whl',
+    '*.so',
+    '*.dll',
+    '*.dylib',
+    '*.exe',
+    '*.o',
+    '*.a',
+    '*.lib',
+    '*.class',
+    '*.jar',
+    '*.war',
+    '*.ear',
+    '*.log',
+    '*.tmp',
+    '*.swp',
+    '*.swo',
+    '*~',
+    '.bak',
+  ];
+  
+  for (const pattern of excludePatterns) {
+    if (pattern.startsWith('*')) {
+      const ext = pattern.substring(1);
+      if (fileName.endsWith(ext)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }

@@ -42,79 +42,144 @@ const path = __importStar(require("path"));
 const inquirer_1 = __importDefault(require("inquirer"));
 const config_js_1 = require("./config.js");
 const chalk_1 = __importDefault(require("chalk"));
-async function learn(sourcePath) {
+async function learn(sourcePath, updateTemplate = null) {
     const resolvedPath = path.resolve(sourcePath);
     if (!fs.existsSync(resolvedPath)) {
         console.error(chalk_1.default.red(`Error: Path "${sourcePath}" does not exist.`));
         process.exit(1);
     }
-    console.log(chalk_1.default.cyan(`\nScanning structure: ${resolvedPath}`));
-    // 1. Extract structure
+    const isUpdate = !!updateTemplate;
+    const config = (0, config_js_1.loadConfig)();
+    const existingNames = (0, config_js_1.getTemplateNames)(config);
+    let targetName = updateTemplate || '';
+    if (isUpdate) {
+        if (!targetName || !config.templates[targetName]) {
+            console.error(chalk_1.default.red(`Template "${targetName}" not found.`));
+            process.exit(1);
+        }
+    }
+    else {
+        const { newName } = await inquirer_1.default.prompt({
+            type: 'input',
+            name: 'newName',
+            message: 'Name this template:',
+            default: path.basename(resolvedPath)
+        });
+        targetName = newName;
+    }
+    let type = '';
+    if (isUpdate) {
+        const currentType = config.templates[updateTemplate].type;
+        const { keepType } = await inquirer_1.default.prompt({
+            type: 'confirm',
+            name: 'keepType',
+            message: `Keep current type "${currentType}"?`,
+            default: true
+        });
+        if (keepType) {
+            type = currentType;
+        }
+        else {
+            const typeChoice = await inquirer_1.default.prompt({
+                type: 'list',
+                name: 'type',
+                message: 'Select Project Type:',
+                choices: [
+                    ...existingNames.map(n => ({ name: `Use existing: ${n}`, value: n })),
+                    { name: '(Create new type)', value: '__NEW__' }
+                ]
+            });
+            type = typeChoice.type;
+            if (type === '__NEW__') {
+                const { newTypeName } = await inquirer_1.default.prompt({
+                    type: 'input',
+                    name: 'newTypeName',
+                    message: 'New type name:'
+                });
+                type = newTypeName;
+            }
+        }
+    }
+    else {
+        const typeChoice = await inquirer_1.default.prompt({
+            type: 'list',
+            name: 'type',
+            message: 'Select Project Type:',
+            choices: [
+                ...existingNames.map(n => ({ name: `Use existing: ${n}`, value: n })),
+                { name: '(Create new type)', value: '__NEW__' }
+            ]
+        });
+        type = typeChoice.type;
+        if (type === '__NEW__') {
+            const { newTypeName } = await inquirer_1.default.prompt({
+                type: 'input',
+                name: 'newTypeName',
+                message: 'New type name:'
+            });
+            type = newTypeName;
+        }
+    }
+    const { hasVariables } = await inquirer_1.default.prompt({
+        type: 'confirm',
+        name: 'hasVariables',
+        message: 'Define template variables (e.g., client_name, project_type)?',
+        default: false
+    });
+    let variables = [];
+    if (hasVariables) {
+        const { variableDefs } = await inquirer_1.default.prompt({
+            type: 'input',
+            name: 'variableDefs',
+            message: 'Define variables as comma-separated names (e.g., client_name,project_type):',
+            default: 'client_name,project_name'
+        });
+        variables = variableDefs.split(',').map((v) => ({
+            name: v.trim(),
+            prompt: `Enter ${v.trim()}:`,
+            required: true
+        }));
+    }
     const folders = extractStructure(resolvedPath, resolvedPath);
     if (folders.length === 0) {
         console.log(chalk_1.default.yellow("No folders found (excluding .git, node_modules, etc)."));
         return;
     }
-    // 2. Get template name/type
-    const config = (0, config_js_1.loadConfig)();
-    const existingNames = (0, config_js_1.getTemplateNames)(config);
-    const { newName } = await inquirer_1.default.prompt({
-        type: 'input',
-        name: 'newName',
-        message: 'Name this template:',
-        default: path.basename(resolvedPath)
-    });
-    const typeChoice = await inquirer_1.default.prompt({
-        type: 'list',
-        name: 'type',
-        message: 'Select Project Type:',
-        choices: [
-            ...existingNames.map(n => ({ name: `Use existing: ${n}`, value: n })),
-            { name: '(Create new type)', value: '__NEW__' }
-        ]
-    });
-    let type = typeChoice.type;
-    if (type === '__NEW__') {
-        const { newTypeName } = await inquirer_1.default.prompt({
-            type: 'input',
-            name: 'newTypeName',
-            message: 'New type name:'
-        });
-        type = newTypeName;
-    }
-    // 3. Update config
     const templateConfig = {
-        name: newName,
+        name: path.basename(resolvedPath),
         type: type,
-        folders: folders
+        folders: folders,
+        variables: variables.length > 0 ? variables : undefined
     };
-    config.templates[newName] = templateConfig;
+    config.templates[targetName] = templateConfig;
     (0, config_js_1.saveConfig)(config);
-    console.log(chalk_1.default.green(`\n✓ Template "${newName}" learned and saved to ~/.pt/config.yaml`));
+    console.log(chalk_1.default.green(`\n${isUpdate ? '✓ Template updated' : '✓ Template learned'} "${targetName}" and saved to ~/.pt/config.yaml`));
     console.log(chalk_1.default.gray(`  Type: ${type}`));
     console.log(chalk_1.default.gray(`  Folders: ${folders.length}`));
+    if (variables.length > 0) {
+        console.log(chalk_1.default.gray(`  Variables: ${variables.map(v => v.name).join(', ')}`));
+    }
 }
 function extractStructure(dirPath, rootPath) {
     let nodes = [];
     try {
         const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-        // Filter out noisy directories/files
-        const ignoreList = ['.git', 'node_modules', 'dist', 'build', '.DS_Store'];
         for (const entry of entries) {
-            if (ignoreList.includes(entry.name))
-                continue;
-            if (entry.name.startsWith('.'))
-                continue; // Hidden files generally
             const fullPath = path.join(dirPath, entry.name);
-            const relPath = path.relative(rootPath, fullPath);
+            // Use shouldExclude from config instead of hardcoded list
+            if ((0, config_js_1.shouldExclude)(dirPath, fullPath)) {
+                continue;
+            }
             if (entry.isDirectory()) {
-                // Recurse
                 const children = extractStructure(fullPath, rootPath);
                 let info = "";
-                // Check for .gitkeep.md
                 const gitkeepPath = path.join(fullPath, '.gitkeep.md');
+                const infoPath = path.join(fullPath, '.info.md');
                 if (fs.existsSync(gitkeepPath)) {
                     info = fs.readFileSync(gitkeepPath, 'utf-8').trim();
+                }
+                else if (fs.existsSync(infoPath)) {
+                    info = fs.readFileSync(infoPath, 'utf-8').trim();
                 }
                 nodes.push({
                     name: entry.name,

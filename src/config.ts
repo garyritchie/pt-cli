@@ -213,5 +213,12 @@ export function shouldExcludeFile(fileName: string): boolean {
 
   return false;
 }
-return safeSegments.join(path.sep);
+// Sanitize path to prevent traversal
+export function sanitizePath(p: string): string {
+  // Remove any path segments that attempt to go up, and trim whitespace
+  const segments = p.split(/[/\\]/);
+  const safeSegments = segments
+    .map(s => s.trim())
+    .filter(s => s !== '..' && s !== '.' && s !== '');
+  return safeSegments.join(path.sep);
 }

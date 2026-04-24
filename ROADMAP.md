@@ -13,6 +13,20 @@
 
 ## Phase 2 - Variable Substitution
 
+### Implementation Progress
+
+| Item | Status |
+|------|--------|
+| `PostConfigTask` / `CopyFileEntry` types in config | ✓ DONE |
+| `substitute.ts` — variable substitution + `processCopyFiles` | ✓ DONE |
+| `postconfig.ts` — post-config runner with cross-platform shell | ✓ DONE |
+| `init.ts` — wires `post_config` into init flow | ✓ DONE |
+| `learn.ts` — store `templateRoot` in config | ⏳ TODO |
+| `copy_files` wired into `init.ts` | ⏳ TODO (blocked by templateRoot) |
+| `--skip-post-config` CLI flag in `index.ts` | ⏳ TODO |
+| `platform.ts` — cross-platform shims | ⏳ TODO |
+| End-to-end test | ⏳ TODO |
+
 ### 1. Variable Substitution in `init`
 
 **Why**: Variables allow customizing content at init time, not just creating blank folders.

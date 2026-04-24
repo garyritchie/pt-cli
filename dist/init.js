@@ -42,7 +42,8 @@ const path = __importStar(require("path"));
 const inquirer_1 = __importDefault(require("inquirer"));
 const config_js_1 = require("./config.js");
 const chalk_1 = __importDefault(require("chalk"));
-async function init(targetName, destPath) {
+const postconfig_js_1 = require("./postconfig.js");
+async function init(targetName, destPath, skipPostConfig = false) {
     const config = (0, config_js_1.loadConfig)();
     let typeName = targetName;
     // If no name provided, list templates
@@ -80,8 +81,15 @@ async function init(targetName, destPath) {
         process.exit(1);
     }
     console.log(chalk_1.default.cyan(`\nInitializing project "${template.name}" at: ${resolvedDest}`));
-    // Recursively create structure
+    // 1. Create structure
     createStructure(resolvedDest, template.folders);
+    // 2. Process copy_files
+    // Note: templateRoot resolution is a pending task.
+    // await processCopyFiles('', resolvedDest, template, {}); 
+    // 3. Run post-config tasks
+    if (template.post_config) {
+        await (0, postconfig_js_1.runPostConfig)(resolvedDest, template.post_config, template.type, skipPostConfig);
+    }
     console.log(chalk_1.default.green(`\n✓ Project created successfully.`));
     console.log(chalk_1.default.gray(`  Run 'cd ${dest}' and 'git init' to get started.`));
 }

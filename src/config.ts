@@ -13,12 +13,31 @@ export interface FolderNode {
   is_file?: boolean;
 }
 
+export interface PostConfigTask {
+  command?: string;       // shell command to run
+  description: string;   // shown to user
+  type?: string;          // only run for matching project type (optional)
+  always_prompt?: boolean; // if true, ask per-task even if user says "yes"
+  script?: string;        // path to script relative to template root
+  cross_platform?: boolean; // if true, use platform-safe runner
+}
+
+export interface CopyFileEntry {
+  src: string;       // relative to template root
+  dest: string;      // relative to project root
+  substitute_variables?: boolean;
+  chmod?: string;    // e.g., "0755"
+}
+
 export interface TemplateConfig {
   name: string;
   type: string;
+  templateRoot?: string;    // path to source directory (set by `pt learn`)
   variables?: TemplateVariable[];
   folders: FolderNode[];
   exclude?: string[];
+  copy_files?: CopyFileEntry[];
+  post_config?: PostConfigTask[];  // NEW
 }
 
 export interface TemplateVariable {

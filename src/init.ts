@@ -3,8 +3,10 @@ import * as path from 'path';
 import inquirer from 'inquirer';
 import { loadConfig, FolderNode } from './config.js';
 import chalk from 'chalk';
+import { processCopyFiles } from './substitute.js';
+import { runPostConfig } from './postconfig.js';
 
-export async function init(targetName: string | undefined, destPath: string | undefined) {
+export async function init(targetName: string | undefined, destPath: string | undefined, skipPostConfig: boolean = false) {
   const config = loadConfig();
   
   let typeName: string | undefined = targetName;
@@ -51,8 +53,17 @@ export async function init(targetName: string | undefined, destPath: string | un
 
   console.log(chalk.cyan(`\nInitializing project "${template.name}" at: ${resolvedDest}`));
   
-  // Recursively create structure
+  // 1. Create structure
   createStructure(resolvedDest, template.folders);
+
+  // 2. Process copy_files
+  // Note: templateRoot resolution is a pending task.
+  // await processCopyFiles('', resolvedDest, template, {}); 
+
+  // 3. Run post-config tasks
+  if (template.post_config) {
+    await runPostConfig(resolvedDest, template.post_config, template.type, skipPostConfig);
+  }
 
   console.log(chalk.green(`\n✓ Project created successfully.`));
   console.log(chalk.gray(`  Run 'cd ${dest}' and 'git init' to get started.`));

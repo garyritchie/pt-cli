@@ -20,11 +20,11 @@ program
   });
 
 program
-  .command('update <template>')
+  .command('update <template> [path]')
   .description('Update an existing template from a directory')
   .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
-  .action(async (templateName, options) => {
-    await learn('.', templateName, options.ignore);
+  .action(async (templateName, sourcePath, options) => {
+    await learn(sourcePath || '.', templateName, options.ignore);
   });
 
 program

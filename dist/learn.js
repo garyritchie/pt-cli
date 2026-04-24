@@ -74,13 +74,17 @@ async function learn(sourcePath, updateTemplate = null, ignoreArgs) {
         const { keepType } = await inquirer_1.default.prompt({
             type: 'confirm',
             name: 'keepType',
-            message: `Keep current type "${currentType}"?`,
+            message: `Change type from "${currentType}"?`,
             default: true
         });
         if (keepType) {
             type = currentType;
         }
         else {
+            console.log(chalk_1.default.yellow('Available types (use existing or create new):'));
+            for (const name of (0, config_js_1.getTemplateNames)(config)) {
+                console.log(chalk_1.default.gray(`  - ${name}`));
+            }
             const typeChoice = await inquirer_1.default.prompt({
                 type: 'list',
                 name: 'type',
@@ -238,27 +242,51 @@ function detectExecutables(sourcePath) {
             if (!entry.isFile())
                 continue;
             const fullPath = path.join(sourcePath, entry.name);
+            let desc = '';
+            let found = false;
+            // Check by extension first
             for (const pat of executablePatterns) {
                 if (pat.name === 'Makefile') {
                     if (entry.name === 'Makefile') {
-                        detected.push(entry.name);
+                        desc = pat.desc;
+                        found = true;
                         break;
                     }
                 }
                 else if (pat.name === '*.mk') {
                     if (entry.name.endsWith('.mk')) {
-                        detected.push(entry.name);
+                        desc = pat.desc;
+                        found = true;
                         break;
                     }
                 }
                 else {
                     const ext = path.extname(entry.name);
-                    const expectedExt = pat.name.substring(1); // remove '*'
+                    const expectedExt = pat.name.substring(1);
                     if (ext === expectedExt) {
-                        detected.push(entry.name);
+                        desc = pat.desc;
+                        found = true;
                         break;
                     }
                 }
+            }
+            // If no extension match, check if file has execute permission
+            if (!found) {
+                try {
+                    const stat = fs.statSync(fullPath);
+                    const mode = stat.mode;
+                    // Check if any execute bit is set (user, group, or other)
+                    if (mode & 0o111) {
+                        desc = 'executable';
+                        found = true;
+                    }
+                }
+                catch {
+                    // Skip files we can't stat
+                }
+            }
+            if (found) {
+                detected.push(entry.name);
             }
         }
     }

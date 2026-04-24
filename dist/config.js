@@ -68,7 +68,7 @@ exports.DEFAULT_EXCLUDES = [
 ];
 // Check if a path should be excluded
 function shouldExclude(dirPath, fullPath, excludes) {
-    const name = path.basename(dirPath);
+    const name = path.basename(fullPath); // Check the entry name, not the parent dir
     const allExcludes = [...exports.DEFAULT_EXCLUDES, ...(excludes || [])];
     // Check if any entry is a git submodule
     if (name === '.git' && fs.existsSync(path.join(fullPath, 'modules'))) {

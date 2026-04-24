@@ -21,11 +21,11 @@ program
     await (0, learn_js_1.learn)(pathArg, null, options.ignore);
 });
 program
-    .command('update <template>')
+    .command('update <template> [path]')
     .description('Update an existing template from a directory')
     .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
-    .action(async (templateName, options) => {
-    await (0, learn_js_1.learn)('.', templateName, options.ignore);
+    .action(async (templateName, sourcePath, options) => {
+    await (0, learn_js_1.learn)(sourcePath || '.', templateName, options.ignore);
 });
 program
     .command('init [type] [path]')

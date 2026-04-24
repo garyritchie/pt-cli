@@ -42,7 +42,7 @@ This makes `pt` available globally.
 ### Usage (local)
 
 ```bash
-npx pt <command>
+pt <command>
 ```
 
 ## Usage
@@ -53,8 +53,12 @@ npx pt <command>
 # Learn a new template (auto-detects post-config tasks)
 pt learn /path/to/project
 
-# Update an existing template
+# Update an existing template (use current directory if no path given)
 pt update <template_name>
+pt update <template_name> /path/to/project
+
+# Ignore specific folders during learning
+pt learn /path/to/project --ignore=DAILIES/*,PARKING_LOT/*,REFERENCE/*
 ```
 
 ### Initialize a project
@@ -103,13 +107,13 @@ Post-config tasks are optional commands that run after a project is initialized.
 
 When learning a template, `pt` scans the source directory for common patterns and suggests post-config tasks:
 
-| Pattern | Auto-detected task | Type filter |
-|---------|-------------------|-------------|
-| `.git/` | `git init` | all |
-| `package.json` | `npm install` | javascript |
-| `requirements.txt` | `pip install -r requirements.txt` | python |
-| `setup.py` or `pyproject.toml` | `pip install -e .` | python |
-| `Makefile` | `make init` | all |
+| Pattern                        | Auto-detected task                | Type filter |
+| ------------------------------ | --------------------------------- | ----------- |
+| `.git/`                        | `git init`                        | all         |
+| `package.json`                 | `npm install`                     | javascript  |
+| `requirements.txt`             | `pip install -r requirements.txt` | python      |
+| `setup.py` or `pyproject.toml` | `pip install -e .`                | python      |
+| `Makefile`                     | `make init`                       | all         |
 
 **Baked-in defaults** (by project type):
 
@@ -146,14 +150,14 @@ templates:
 
 Each task supports:
 
-| Field | Description |
-|-------|-------------|
-| `command` | Shell command to run (auto-selected shell: `cmd /c` on Windows, `sh -c` on Unix) |
-| `description` | Shown to user during prompt |
-| `type` | Filter by project type (e.g., `javascript`) |
-| `always_prompt` | If `true`, ask per-task even if user says "yes" |
-| `script` | Path to script relative to template root |
-| `cross_platform` | If `true`, use platform-safe runner |
+| Field            | Description                                                                      |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `command`        | Shell command to run (auto-selected shell: `cmd /c` on Windows, `sh -c` on Unix) |
+| `description`    | Shown to user during prompt                                                      |
+| `type`           | Filter by project type (e.g., `javascript`)                                      |
+| `always_prompt`  | If `true`, ask per-task even if user says "yes"                                  |
+| `script`         | Path to script relative to template root                                         |
+| `cross_platform` | If `true`, use platform-safe runner                                              |
 
 **Interaction flow** during `pt init`:
 
@@ -195,12 +199,12 @@ templates:
 
 Each entry supports:
 
-| Field | Description |
-|-------|-------------|
-| `src` | Path relative to template root (source directory from `pt learn`) |
-| `dest` | Path relative to project root |
-| `substitute_variables` | If `true`, replace `{{variable_name}}` placeholders |
-| `chmod` | Octal permission string (e.g., `"0755"`) — skipped on Windows |
+| Field                  | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| `src`                  | Path relative to template root (source directory from `pt learn`) |
+| `dest`                 | Path relative to project root                                     |
+| `substitute_variables` | If `true`, replace `{{variable_name}}` placeholders               |
+| `chmod`                | Octal permission string (e.g., `"0755"`) — skipped on Windows     |
 
 **How it works**:
 
@@ -223,13 +227,14 @@ Auto-detect executable scripts during `pt learn` and copy them to the new projec
 
 When learning a template, `pt` scans the source directory root for executable files:
 
-| Pattern | Description |
-|---------|-------------|
-| `*.sh` | Shell scripts |
-| `*.py` | Python scripts |
-| `*.bat` / `*.cmd` | Batch files |
-| `Makefile` | Makefiles |
-| `*.mk` | Makefile includes |
+| Pattern                | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| `*.sh`                 | Shell scripts                                       |
+| `*.py`                 | Python scripts                                      |
+| `*.bat` / `*.cmd`      | Batch files                                         |
+| `Makefile`             | Makefiles                                           |
+| `*.mk`                 | Makefile includes                                   |
+| (no ext, has exec bit) | Any executable file (checks execute permission bit) |
 
 The detected files are presented to the user for confirmation:
 
@@ -257,10 +262,10 @@ templates:
 
 Each entry supports:
 
-| Field | Description |
-|-------|-------------|
-| `src` | Path relative to template root (source directory from `pt learn`) |
-| `dest` | Path relative to project root (defaults to `src` if omitted) |
+| Field  | Description                                                       |
+| ------ | ----------------------------------------------------------------- |
+| `src`  | Path relative to template root (source directory from `pt learn`) |
+| `dest` | Path relative to project root (defaults to `src` if omitted)      |
 
 **How it works**:
 
@@ -330,4 +335,27 @@ The following are excluded by default when learning templates:
 - Compiled files (`.pyc`, `.so`, `.dll`, etc.)
 - `.gitkeep.md`, `.info.md`, `.vale.ini`, `.gitattributes`
 
-Custom exclusions can be added in `src/config.ts`.
+### Ignore Patterns
+
+Use the top-level `ignore` key in `~/.pt/config.yaml` or the `--ignore` flag to exclude folders:
+
+```yaml
+ignore:
+  - DAILIES/*
+  - PARKING_LOT/*
+  - REFERENCE/*
+```
+
+Patterns use wildcards for clarity:
+
+| Pattern      | Effect                                                                       |
+| ------------ | ---------------------------------------------------------------------------- |
+| `DAILIES/*`  | Ignore all contents of DAILIES (DAILIES itself is kept as a template folder) |
+| `DAILIES/**` | Same as `DAILIES/*` (deep match)                                             |
+| `NODE`       | Ignore this specific folder only (no wildcard = exact match)                 |
+
+The CLI flag `--ignore=DAILIES/*,PARKING_LOT/*` merges with the config patterns (one-shot, not persistent).
+
+### Custom exclusions
+
+Additional patterns can be added to `DEFAULT_EXCLUDES` in `src/config.ts`.

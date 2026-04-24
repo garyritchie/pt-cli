@@ -46,13 +46,17 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     const { keepType } = await inquirer.prompt({
       type: 'confirm',
       name: 'keepType',
-      message: `Keep current type "${currentType}"?`,
+      message: `Change type from "${currentType}"?`,
       default: true
     });
     
     if (keepType) {
       type = currentType;
     } else {
+      console.log(chalk.yellow('Available types (use existing or create new):'));
+      for (const name of getTemplateNames(config)) {
+        console.log(chalk.gray(`  - ${name}`));
+      }
       const typeChoice = await inquirer.prompt({
         type: 'list',
         name: 'type',
@@ -221,26 +225,39 @@ export function detectExecutables(sourcePath: string): string[] {
       if (!entry.isFile()) continue;
       
       const fullPath = path.join(sourcePath, entry.name);
+      let desc = '';
+      let found = false;
       
+      // Check by extension first
       for (const pat of executablePatterns) {
         if (pat.name === 'Makefile') {
-          if (entry.name === 'Makefile') {
-            detected.push(entry.name);
-            break;
-          }
+          if (entry.name === 'Makefile') { desc = pat.desc; found = true; break; }
         } else if (pat.name === '*.mk') {
-          if (entry.name.endsWith('.mk')) {
-            detected.push(entry.name);
-            break;
-          }
+          if (entry.name.endsWith('.mk')) { desc = pat.desc; found = true; break; }
         } else {
           const ext = path.extname(entry.name);
-          const expectedExt = pat.name.substring(1); // remove '*'
-          if (ext === expectedExt) {
-            detected.push(entry.name);
-            break;
-          }
+          const expectedExt = pat.name.substring(1);
+          if (ext === expectedExt) { desc = pat.desc; found = true; break; }
         }
+      }
+      
+      // If no extension match, check if file has execute permission
+      if (!found) {
+        try {
+          const stat = fs.statSync(fullPath);
+          const mode = stat.mode;
+          // Check if any execute bit is set (user, group, or other)
+          if (mode & 0o111) {
+            desc = 'executable';
+            found = true;
+          }
+        } catch {
+          // Skip files we can't stat
+        }
+      }
+      
+      if (found) {
+        detected.push(entry.name);
       }
     }
   } catch (e) {

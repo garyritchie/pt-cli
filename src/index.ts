@@ -92,4 +92,34 @@ program
         type: "javascript"`));
   });
 
+program
+  .command('remove <template>')
+  .alias('rm')
+  .description('Remove a learned template from the config')
+  .action(async (templateName) => {
+    const { loadConfig, saveConfig } = require('./config.js');
+    const config = loadConfig();
+    const inquirer = (await import('inquirer')).default;
+    
+    if (!config.templates[templateName]) {
+      console.error(chalk.red(`Template "${templateName}" not found.`));
+      process.exit(1);
+    }
+
+    const { confirmRemoval } = await inquirer.prompt({
+      type: 'confirm',
+      name: 'confirmRemoval',
+      message: `Are you sure you want to remove template "${templateName}"?`,
+      default: false
+    });
+
+    if (confirmRemoval) {
+      delete config.templates[templateName];
+      saveConfig(config);
+      console.log(chalk.green(`✓ Template "${templateName}" removed.`));
+    } else {
+      console.log(chalk.gray('Removal cancelled.'));
+    }
+  });
+
 program.parse(process.argv);

@@ -78,7 +78,7 @@ export async function init(targetName: string | undefined, destPath: string | un
   if (template.post_copy && template.templateRoot) {
     if (dryRun) console.log(chalk.yellow("[DRY RUN] Processing post_copy..."));
     else console.log(chalk.cyan("Processing post_copy..."));
-    
+
     for (const file of template.post_copy) {
       const srcPath = path.join(template.templateRoot, file.src);
       const destPath = path.join(resolvedDest, file.dest || file.src);
@@ -122,14 +122,13 @@ export async function init(targetName: string | undefined, destPath: string | un
     console.log(chalk.yellow(`\n[DRY RUN] Project initialization preview complete.`));
   } else {
     console.log(chalk.green(`\n✓ Project created successfully.`));
-    console.log(chalk.gray(`  Run 'cd ${dest}' and 'git init' to get started.`));
   }
 }
 
 function createStructure(dirPath: string, folders: FolderNode[], dryRun: boolean = false) {
   for (const folder of folders) {
     const fullDirPath = path.join(dirPath, folder.name);
-    
+
     if (dryRun) {
       console.log(chalk.gray(`  [DRY RUN] Would create directory: ${fullDirPath}`));
     } else {

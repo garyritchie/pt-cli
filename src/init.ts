@@ -23,6 +23,12 @@ export async function init(targetName: string | undefined, destPath: string | un
       type: 'list',
       name: 'selected',
       message: 'Select Project Type:',
+      loop: false,
+      theme: {
+        icon: {
+          cursor: chalk.green('[x] ')
+        }
+      },
       choices: names.map(n => ({ name: n, value: n }))
     });
     typeName = selected;

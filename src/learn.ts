@@ -53,15 +53,17 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     if (!changeType) {
       type = currentType;
     } else {
-      console.log(chalk.yellow('Available types (use existing or create new):'));
-      const existingTypes = Array.from(new Set(Object.values(config.templates).map(t => t.type)));
-      for (const t of existingTypes) {
-        console.log(chalk.gray(`  - ${t}`));
-      }
+      const existingTypes = Array.from(new Set(Object.values(config.templates || {}).filter(t => t && t.type).map(t => t.type)));
       const typeChoice = await inquirer.prompt({
         type: 'list',
         name: 'type',
         message: 'Select Project Type:',
+        loop: false,
+        theme: {
+          icon: {
+            cursor: chalk.green('[x] ')
+          }
+        },
         choices: [
           ...existingTypes.map(t => ({ name: `Use existing: ${t}`, value: t })),
           { name: '(Create new type)', value: '__NEW__' }
@@ -78,12 +80,19 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       }
     }
   } else {
+    const existingTypes = Array.from(new Set(Object.values(config.templates || {}).filter(t => t && t.type).map(t => t.type)));
     const typeChoice = await inquirer.prompt({
       type: 'list',
       name: 'type',
       message: 'Select Project Type:',
+      loop: false,
+      theme: {
+        icon: {
+          cursor: chalk.green('[x] ')
+        }
+      },
       choices: [
-        ...existingNames.map(n => ({ name: `Use existing: ${n}`, value: n })),
+        ...existingTypes.map(t => ({ name: `Use existing: ${t}`, value: t })),
         { name: '(Create new type)', value: '__NEW__' }
       ]
     });
@@ -99,15 +108,8 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     }
   }
 
-  // Merge CLI --ignore patterns with config's ignore list
   const cliIgnore = ignoreArgs ? ignoreArgs.split(',').map(s => s.trim()).filter(Boolean) : [];
   const ignorePatterns = [...(config.ignore || []), ...cliIgnore];
-  if (ignorePatterns.length > 0 && !isUpdate) {
-    console.log(chalk.cyan("\nIgnore patterns active:"));
-    for (const p of ignorePatterns) {
-      console.log(chalk.gray("  - " + p));
-    }
-  }
 
   const { hasVariables } = await inquirer.prompt({
     type: 'confirm',
@@ -121,7 +123,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     const { variableDefs } = await inquirer.prompt({
       type: 'input',
       name: 'variableDefs',
-      message: 'Define variables as comma-separated names (e.g., client_name,project_type):',
+      message: 'Define variables as comma-separated names:',
       default: 'client_name,project_name'
     });
     variables = variableDefs.split(',').map((v: string) => ({
@@ -131,227 +133,132 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     }));
   }
 
+  // 1. Structure (skeleton)
   const folders = extractStructure(resolvedPath, resolvedPath, ignorePatterns);
-  const allFiles = collectFiles(resolvedPath, resolvedPath, ignorePatterns);
-  
-  if (folders.length === 0 && allFiles.length === 0) {
-    console.log(chalk.yellow("No folders or files found (excluding .git, node_modules, etc)."));
-    return;
+
+  // 2. Content Selection (Root only)
+  const rootEntries = fs.readdirSync(resolvedPath, { withFileTypes: true })
+    .filter(e => !shouldExclude(resolvedPath, path.join(resolvedPath, e.name), ignorePatterns))
+    .filter(e => !shouldIgnore(e.name, e.name, ignorePatterns));
+
+  const rootFiles = rootEntries.filter(e => e.isFile()).map(e => e.name);
+  const rootDirs = rootEntries.filter(e => e.isDirectory()).map(e => e.name);
+
+  const { selectedFiles } = await inquirer.prompt({
+    type: 'checkbox',
+    name: 'selectedFiles',
+    message: 'Select root files to include as boilerplate:',
+    loop: false,
+    theme: {
+      icon: {
+        checked: chalk.green('[x] '),
+        unchecked: '[ ] ',
+      }
+    },
+    choices: rootFiles.map(f => ({ 
+      name: f, 
+      checked: ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()) 
+    }))
+  });
+
+  const { selectedFolders } = await inquirer.prompt({
+    type: 'checkbox',
+    name: 'selectedFolders',
+    message: 'Select folders to copy recursively as boilerplate:',
+    loop: false,
+    theme: {
+      icon: {
+        checked: chalk.green('[x] '),
+        unchecked: '[ ] ',
+      }
+    },
+    choices: rootDirs.map(d => ({ 
+      name: d, 
+      checked: ['APP', 'scripts', 'bin'].some(p => d === p) 
+    }))
+  });
+
+  const copy_files: any[] = [];
+  for (const f of selectedFiles) {
+    copy_files.push({ src: f, dest: f, substitute_variables: true });
+  }
+  for (const d of selectedFolders) {
+    copy_files.push({ src: d, dest: d, substitute_variables: true });
   }
 
   const templateConfig: TemplateConfig = {
     name: path.basename(resolvedPath),
     type: type,
-    templateRoot: resolvedPath,    // absolute path to source directory
+    templateRoot: resolvedPath,
     folders: folders,
-    copy_files: allFiles,
+    copy_files: copy_files,
     variables: variables.length > 0 ? variables : undefined
   };
 
-
-  // Auto-detect executable files at project root
-  const detectedExecutables = detectExecutables(resolvedPath);
-  let post_copy: PostCopyFile[] | undefined;
-  
-  if (detectedExecutables.length > 0) {
-    console.log(chalk.cyan("\nAuto-detected " + detectedExecutables.length + " executable file(s) at project root:"));
-    for (const file of detectedExecutables) {
-      // find description
-      let desc = '';
-      const patterns = [
-        { name: '*.sh', desc: 'shell script' },
-        { name: '*.py', desc: 'Python script' },
-        { name: '*.bat', desc: 'batch file' },
-        { name: '*.cmd', desc: 'batch file' },
-        { name: 'Makefile', desc: 'makefile' },
-        { name: '*.mk', desc: 'makefile include' },
-      ];
-      for (const pat of patterns) {
-        if (pat.name === 'Makefile') {
-          if (file === 'Makefile') desc = pat.desc;
-        } else if (pat.name === '*.mk') {
-          if (file.endsWith('.mk')) desc = pat.desc;
-        } else {
-          if (path.extname(file) === pat.name.substring(1)) desc = pat.desc;
-        }
-        if (desc) break;
-      }
-      console.log(chalk.gray("  - " + file + " (" + desc + ")"));
+  // 3. Detect executables at root
+  const detectedExecutables: string[] = [];
+  for (const file of rootFiles) {
+    const fullPath = path.join(resolvedPath, file);
+    if (isExecutable(fullPath, file)) {
+      detectedExecutables.push(file);
     }
-    
+  }
+
+  if (detectedExecutables.length > 0) {
+    console.log(chalk.cyan("\nAuto-detected " + detectedExecutables.length + " executable file(s) at root:"));
+    for (const file of detectedExecutables) {
+      console.log(chalk.gray("  - " + file));
+    }
     const { addPostCopy } = await inquirer.prompt({
       type: 'confirm',
       name: 'addPostCopy',
-      message: 'Add these to post_copy (copied during pt init)?',
+      message: 'Add these to post_copy (auto-chmod)?',
       default: true
     });
-    
     if (addPostCopy) {
-      post_copy = detectedExecutables.map(f => ({ src: f, dest: f }));
-      // Remove these from copy_files to avoid duplication
-      if (templateConfig.copy_files) {
-        templateConfig.copy_files = templateConfig.copy_files.filter(cf => !detectedExecutables.includes(cf.src));
-      }
+      templateConfig.post_copy = detectedExecutables.map(f => ({ src: f, dest: f }));
+      templateConfig.copy_files = templateConfig.copy_files?.filter(cf => !detectedExecutables.includes(cf.src));
     }
   }
-  if (post_copy) {
-    templateConfig.post_copy = post_copy;
-  }
+
   config.templates[targetName] = templateConfig;
   saveConfig(config);
 
-  console.log(chalk.green(`\n${isUpdate ? '✓ Template updated' : '✓ Template learned'} "${targetName}" and saved to ~/.pt/config.yaml`));
-  console.log(chalk.gray(`  Type: ${type}`));
-  console.log(chalk.gray(`  Folders: ${folders.length}`));
-  if (variables.length > 0) {
-    console.log(chalk.gray(`  Variables: ${variables.map(v => v.name).join(', ')}`));
-  }
+  console.log(chalk.green(`\n✓ Template saved as "${targetName}"`));
 }
 
-
-/**
- * Scan the root of the template directory for executable/script files.
- * Returns filenames relative to the project root.
- */
-export function detectExecutables(sourcePath: string): string[] {
-  const executablePatterns = [
-    { name: '*.sh', desc: 'shell script' },
-    { name: '*.py', desc: 'Python script' },
-    { name: '*.bat', desc: 'batch file' },
-    { name: '*.cmd', desc: 'batch file' },
-    { name: 'Makefile', desc: 'makefile' },
-    { name: 'makefile', desc: 'makefile' },
-    { name: '*.mk', desc: 'makefile include' },
-  ];
-  
-  let detected: string[] = [];
-  
+function isExecutable(fullPath: string, fileName: string): boolean {
+  if (shouldExcludeFile(fileName)) return false;
+  const ext = path.extname(fileName).toLowerCase();
+  if (['.sh', '.py', '.bash', '.bat', '.cmd'].includes(ext)) return true;
+  if (fileName.toLowerCase() === 'makefile') return true;
   try {
-    const entries = fs.readdirSync(sourcePath, { withFileTypes: true });
-    
-    for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      
-      // Skip files that should be excluded (common data/config/doc files)
-      if (shouldExcludeFile(entry.name)) continue;
-      if (shouldExclude(sourcePath, path.join(sourcePath, entry.name))) continue;
-      
-      // Also skip dotfiles unless they match a specific pattern (like .sh)
-      if (entry.name.startsWith('.') && !entry.name.endsWith('.sh') && !entry.name.endsWith('.py')) {
-        continue;
-      }
-
-      const fullPath = path.join(sourcePath, entry.name);
-      let desc = '';
-      let found = false;
-      
-      // Check by extension first
-      for (const pat of executablePatterns) {
-        if (pat.name === 'Makefile' || pat.name === 'makefile') {
-          if (entry.name === pat.name) { desc = pat.desc; found = true; break; }
-        } else if (pat.name === '*.mk') {
-          if (entry.name.endsWith('.mk')) { desc = pat.desc; found = true; break; }
-        } else {
-          const ext = path.extname(entry.name);
-          const expectedExt = pat.name.substring(1);
-          if (ext === expectedExt) { desc = pat.desc; found = true; break; }
-        }
-      }
-      
-      // If no extension match, check if file has execute permission
-      if (!found) {
-        try {
-          const stat = fs.statSync(fullPath);
-          const mode = stat.mode;
-          // Check if any execute bit is set (user, group, or other)
-          if (mode & 0o111) {
-            desc = 'executable';
-            found = true;
-          }
-        } catch {
-          // Skip files we can't stat
-        }
-      }
-      
-      if (found) {
-        detected.push(entry.name);
-      }
-    }
-  } catch (e) {
-    // Skip permission errors
+    const stat = fs.statSync(fullPath);
+    return !!(stat.mode & 0o111);
+  } catch {
+    return false;
   }
-  
-  return detected;
-}
-
-function collectFiles(dirPath: string, rootPath: string, ignorePatterns?: string[]): any[] {
-  let files: any[] = [];
-  try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
-      const relativePath = path.relative(rootPath, fullPath);
-
-      if (shouldExclude(dirPath, fullPath, ignorePatterns)) continue;
-      if (shouldIgnore(entry.name, relativePath, ignorePatterns)) continue;
-
-      if (entry.isDirectory()) {
-        files = files.concat(collectFiles(fullPath, rootPath, ignorePatterns));
-      } else if (entry.isFile()) {
-        files.push({
-          src: relativePath,
-          dest: relativePath,
-          substitute_variables: true
-        });
-      }
-    }
-  } catch (e) {}
-  return files;
 }
 
 function extractStructure(dirPath: string, rootPath: string, ignorePatterns?: string[]): FolderNode[] {
   let nodes: FolderNode[] = [];
-  
   try {
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
       const relativePath = path.relative(rootPath, fullPath);
-      
-      // Check ignore patterns first
-      if (entry.isDirectory() && shouldIgnore(entry.name, relativePath, ignorePatterns)) {
-        continue;
-      }
-      
-      // Use shouldExclude from config instead of hardcoded list
-      if (shouldExclude(dirPath, fullPath)) {
-        continue;
-      }
-      
+      if (entry.isDirectory() && shouldIgnore(entry.name, relativePath, ignorePatterns)) continue;
+      if (shouldExclude(dirPath, fullPath)) continue;
       if (entry.isDirectory()) {
         const children = extractStructure(fullPath, rootPath, ignorePatterns);
         let info = "";
-        
         const gitkeepPath = path.join(fullPath, '.gitkeep.md');
         const infoPath = path.join(fullPath, '.info.md');
-        
-        if (fs.existsSync(gitkeepPath)) {
-          info = fs.readFileSync(gitkeepPath, 'utf-8').trim();
-        } else if (fs.existsSync(infoPath)) {
-          info = fs.readFileSync(infoPath, 'utf-8').trim();
-        }
-        
-        nodes.push({
-          name: entry.name,
-          info: info,
-          children: children
-        });
+        if (fs.existsSync(gitkeepPath)) info = fs.readFileSync(gitkeepPath, 'utf-8').trim();
+        else if (fs.existsSync(infoPath)) info = fs.readFileSync(infoPath, 'utf-8').trim();
+        nodes.push({ name: entry.name, info: info, children: children });
       }
     }
-  } catch (e) {
-    // Skip permission errors
-  }
-  
+  } catch (e) {}
   return nodes;
 }

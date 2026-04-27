@@ -241,6 +241,47 @@ Each entry supports:
 - Template root not set: skip silently (learn stores this)
 - Permission errors: caught and logged
 
+#### Example: Variable Substitution
+
+A plausible scenario for customizing a new project's `package.json` and `README.md`:
+
+**1. Define in `config.yaml`**:
+```yaml
+templates:
+  node_web_app:
+    description: "A standard Node.js web application"
+    variables:
+      - name: "project_name"
+        prompt: "What is the project name?"
+        default: "my-app"
+      - name: "author_name"
+        prompt: "Who is the author?"
+        required: true
+    copy_files:
+      - src: "templates/package.json.tmpl"
+        dest: "package.json"
+        substitute_variables: true
+```
+
+**2. Template source (`templates/package.json.tmpl`)**:
+```json
+{
+  "name": "{{project_name}}",
+  "author": "{{author_name}}",
+  "version": "1.0.0"
+}
+```
+
+**3. Resulting project file**:
+If the user enters `my-service` and `Jane Doe`, the file `package.json` will be created with:
+```json
+{
+  "name": "my-service",
+  "author": "Jane Doe",
+  "version": "1.0.0"
+}
+```
+
 ### Post-Copy
 
 Auto-detect executable scripts during `pt learn` and copy them to the new project:

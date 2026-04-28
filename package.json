@@ -1,6 +1,6 @@
 {
   "name": "pt-cli",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Project Template CLI - Learn structures and initialize projects",
   "main": "dist/index.js",
   "bin": {

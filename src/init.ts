@@ -6,7 +6,7 @@ import chalk from 'chalk';
 import { processCopyFiles } from './substitute.js';
 import { runPostConfig } from './postconfig.js';
 
-export async function init(targetName: string | undefined, destPath: string | undefined, skipPostConfig: boolean = false, dryRun: boolean = false) {
+export async function init(targetName: string | undefined, destPath: string | undefined, options: any = {}) {
   const config = loadConfig();
 
   let typeName: string | undefined = targetName;
@@ -19,6 +19,10 @@ export async function init(targetName: string | undefined, destPath: string | un
       return;
     }
 
+    if (options.yes) {
+      console.error(chalk.red("No project type specified and running in non-interactive mode."));
+      process.exit(1);
+    }
     const { selected } = await inquirer.prompt({
       type: 'list',
       name: 'selected',
@@ -42,6 +46,10 @@ export async function init(targetName: string | undefined, destPath: string | un
 
   let dest: string | undefined = destPath;
   if (!dest) {
+    if (options.yes) {
+      console.error(chalk.red("No destination path specified and running in non-interactive mode."));
+      process.exit(1);
+    }
     const { name } = await inquirer.prompt({
       type: 'input',
       name: 'name',
@@ -52,31 +60,73 @@ export async function init(targetName: string | undefined, destPath: string | un
 
   const resolvedDest = path.resolve(dest!);
 
-  if (fs.existsSync(resolvedDest) && !dryRun) {
+  if (fs.existsSync(resolvedDest) && !options.dryRun) {
     console.error(chalk.red(`Error: Destination "${resolvedDest}" already exists.`));
     process.exit(1);
   }
 
-  if (dryRun) {
+  if (options.dryRun) {
     console.log(chalk.yellow(`\n[DRY RUN] Initializing project "${template.description}" at: ${resolvedDest}`));
   } else {
     console.log(chalk.cyan(`\nInitializing project "${template.description}" at: ${resolvedDest}`));
   }
 
+  // Handle Variables
+  let variables: Record<string, string> = {};
+  if (template.variables && template.variables.length > 0) {
+    if (options.vars) {
+      // Parse --vars "key=val,key2=val2"
+      const pairs = options.vars.split(',').map((p: string) => p.trim());
+      for (const pair of pairs) {
+        const [k, ...v] = pair.split('=');
+        if (k && v.length > 0) {
+          variables[k.trim()] = v.join('=').trim();
+        }
+      }
+    }
+
+    if (!options.yes) {
+      // Prompt for any missing variables
+      for (const v of template.variables) {
+        if (!variables[v.name]) {
+          const answer = await inquirer.prompt({
+            type: 'input',
+            name: v.name,
+            message: v.prompt || `Enter ${v.name}:`,
+            default: v.default || ''
+          });
+          variables[v.name] = answer[v.name];
+        }
+      }
+    } else {
+      // Non-interactive mode: check required
+      for (const v of template.variables) {
+        if (!variables[v.name]) {
+          if (v.required) {
+            console.error(chalk.red(`Error: Variable "${v.name}" is required but was not provided in non-interactive mode. Use --vars ${v.name}=value`));
+            process.exit(1);
+          } else {
+            variables[v.name] = v.default || '';
+          }
+        }
+      }
+    }
+  }
+
   // 1. Create structure
-  createStructure(resolvedDest, template.folders, dryRun);
+  createStructure(resolvedDest, template.folders, options.dryRun);
 
   // 2. Process copy_files
   if (template.copy_files && template.templateRoot) {
-    if (dryRun) console.log(chalk.yellow("[DRY RUN] Processing copy_files..."));
+    if (options.dryRun) console.log(chalk.yellow("[DRY RUN] Processing copy_files..."));
     else console.log(chalk.cyan("Processing copy_files..."));
-    await processCopyFiles(template.templateRoot, resolvedDest, template, {}, dryRun);
+    await processCopyFiles(template.templateRoot, resolvedDest, template, variables, options.dryRun);
   }
 
 
   // 3. Process post_copy (executable scripts)
   if (template.post_copy && template.templateRoot) {
-    if (dryRun) console.log(chalk.yellow("[DRY RUN] Processing post_copy..."));
+    if (options.dryRun) console.log(chalk.yellow("[DRY RUN] Processing post_copy..."));
     else console.log(chalk.cyan("Processing post_copy..."));
 
     for (const file of template.post_copy) {
@@ -84,7 +134,7 @@ export async function init(targetName: string | undefined, destPath: string | un
       const destPath = path.join(resolvedDest, file.dest || file.src);
 
       if (fs.existsSync(srcPath)) {
-        if (dryRun) {
+        if (options.dryRun) {
           console.log(chalk.gray(`  [DRY RUN] Would copy ${file.src} → ${file.dest || file.src}`));
           const ext = path.extname(file.src);
           if (['.sh', '.py', '.bash', '.bat'].includes(ext)) {
@@ -115,10 +165,10 @@ export async function init(targetName: string | undefined, destPath: string | un
   }
   // 4. Run post-config tasks
   if (template.post_config) {
-    await runPostConfig(resolvedDest, template.post_config, typeName!, skipPostConfig, dryRun);
+    await runPostConfig(resolvedDest, template.post_config, typeName!, options);
   }
 
-  if (dryRun) {
+  if (options.dryRun) {
     console.log(chalk.yellow(`\n[DRY RUN] Project initialization preview complete.`));
   } else {
     console.log(chalk.green(`\n✓ Project created successfully.`));

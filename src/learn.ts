@@ -11,7 +11,7 @@ export interface TemplateVariable {
   required?: boolean;
 }
 
-export async function learn(sourcePath: string, updateTemplate: string | null = null, ignoreArgs?: string): Promise<void> {
+export async function learn(sourcePath: string, updateTemplate: string | null = null, options: any = {}): Promise<void> {
   const resolvedPath = path.resolve(sourcePath);
   
   if (!fs.existsSync(resolvedPath)) {
@@ -31,55 +31,73 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       process.exit(1);
     }
   } else {
-    const { newName } = await inquirer.prompt({
-      type: 'input',
-      name: 'newName',
-      message: 'Name this template:',
-      default: path.basename(resolvedPath)
-    });
-    targetName = newName;
+    if (options.name) {
+      targetName = options.name;
+    } else {
+      const { newName } = await inquirer.prompt({
+        type: 'input',
+        name: 'newName',
+        message: 'Name this template:',
+        default: path.basename(resolvedPath)
+      });
+      targetName = newName;
+    }
   }
 
   let description = '';
-  if (isUpdate) {
+  if (options.desc) {
+    description = options.desc;
+  } else if (isUpdate) {
     const currentDesc = config.templates[updateTemplate].description || '';
-    const { changeDesc } = await inquirer.prompt({
-      type: 'confirm',
-      name: 'changeDesc',
-      message: `Change description from "${currentDesc}"?`,
-      default: false
-    });
-    
-    if (!changeDesc) {
+    if (options.yes) {
       description = currentDesc;
+    } else {
+      const { changeDesc } = await inquirer.prompt({
+        type: 'confirm',
+        name: 'changeDesc',
+        message: `Change description from "${currentDesc}"?`,
+        default: false
+      });
+      
+      if (!changeDesc) {
+        description = currentDesc;
+      } else {
+        const { newDesc } = await inquirer.prompt({
+          type: 'input',
+          name: 'newDesc',
+          message: 'Purpose/Description of this template:',
+          default: currentDesc
+        });
+        description = newDesc;
+      }
+    }
+  } else {
+    if (options.yes) {
+      description = targetName;
     } else {
       const { newDesc } = await inquirer.prompt({
         type: 'input',
         name: 'newDesc',
         message: 'Purpose/Description of this template:',
-        default: currentDesc
+        default: targetName
       });
       description = newDesc;
     }
-  } else {
-    const { newDesc } = await inquirer.prompt({
-      type: 'input',
-      name: 'newDesc',
-      message: 'Purpose/Description of this template:',
-      default: targetName
-    });
-    description = newDesc;
   }
 
-  const cliIgnore = ignoreArgs ? ignoreArgs.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const cliIgnore = options.ignore ? options.ignore.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
   const ignorePatterns = [...(config.ignore || []), ...cliIgnore];
 
-  const { hasVariables } = await inquirer.prompt({
-    type: 'confirm',
-    name: 'hasVariables',
-    message: 'Define template variables (e.g., client_name, project_type)?',
-    default: false
-  });
+  let hasVariables = false;
+  if (!options.yes) {
+    const response = await inquirer.prompt({
+      type: 'confirm',
+      name: 'hasVariables',
+      message: 'Define template variables (e.g., client_name, project_type)?',
+      default: false
+    });
+    hasVariables = response.hasVariables;
+  }
 
   let variables: TemplateVariable[] = [];
   if (hasVariables) {
@@ -107,39 +125,50 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const rootFiles = rootEntries.filter(e => e.isFile()).map(e => e.name);
   const rootDirs = rootEntries.filter(e => e.isDirectory()).map(e => e.name);
 
-  const { selectedFiles } = await inquirer.prompt({
-    type: 'checkbox',
-    name: 'selectedFiles',
-    message: 'Select root files to include as boilerplate:',
-    loop: false,
-    theme: {
-      icon: {
-        checked: chalk.green('[x] '),
-        unchecked: '[ ] ',
-      }
-    },
-    choices: rootFiles.map(f => ({ 
-      name: f, 
-      checked: ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()) 
-    }))
-  });
+  let selectedFiles: string[] = [];
+  let selectedFolders: string[] = [];
+  
+  if (options.yes) {
+    // If --yes, auto-select the defaults
+    selectedFiles = rootFiles.filter(f => ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()));
+    selectedFolders = rootDirs.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
+  } else {
+    const filesResponse = await inquirer.prompt({
+      type: 'checkbox',
+      name: 'selectedFiles',
+      message: 'Select root files to include as boilerplate:',
+      loop: false,
+      theme: {
+        icon: {
+          checked: chalk.green('[x] '),
+          unchecked: '[ ] ',
+        }
+      },
+      choices: rootFiles.map(f => ({ 
+        name: f, 
+        checked: ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()) 
+      }))
+    });
+    selectedFiles = filesResponse.selectedFiles;
 
-  const { selectedFolders } = await inquirer.prompt({
-    type: 'checkbox',
-    name: 'selectedFolders',
-    message: 'Select folders to copy recursively as boilerplate:',
-    loop: false,
-    theme: {
-      icon: {
-        checked: chalk.green('[x] '),
-        unchecked: '[ ] ',
-      }
-    },
-    choices: rootDirs.map(d => ({ 
-      name: d, 
-      checked: ['APP', 'scripts', 'bin'].some(p => d === p) 
-    }))
-  });
+    const foldersResponse = await inquirer.prompt({
+      type: 'checkbox',
+      name: 'selectedFolders',
+      message: 'Select folders to copy recursively as boilerplate:',
+      loop: false,
+      theme: {
+        icon: {
+          checked: chalk.green('[x] '),
+          unchecked: '[ ] ',
+        }
+      },
+      choices: rootDirs.map(d => ({ 
+        name: d, 
+        checked: ['APP', 'scripts', 'bin'].some(p => d === p) 
+      }))
+    });
+    selectedFolders = foldersResponse.selectedFolders;
+  }
 
   const copy_files: any[] = [];
   for (const f of selectedFiles) {
@@ -171,12 +200,16 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     for (const file of detectedExecutables) {
       console.log(chalk.gray("  - " + file));
     }
-    const { addPostCopy } = await inquirer.prompt({
-      type: 'confirm',
-      name: 'addPostCopy',
-      message: 'Add these to post_copy (auto-chmod)?',
-      default: true
-    });
+    let addPostCopy = true;
+    if (!options.yes) {
+      const response = await inquirer.prompt({
+        type: 'confirm',
+        name: 'addPostCopy',
+        message: 'Add these to post_copy (auto-chmod)?',
+        default: true
+      });
+      addPostCopy = response.addPostCopy;
+    }
     if (addPostCopy) {
       templateConfig.post_copy = detectedExecutables.map(f => ({ src: f, dest: f }));
       templateConfig.copy_files = templateConfig.copy_files?.filter(cf => !detectedExecutables.includes(cf.src));

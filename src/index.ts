@@ -15,16 +15,21 @@ program
   .command('learn <path>')
   .description('Scan a directory and learn its structure as a template')
   .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
+  .option('-y, --yes', 'Automatically confirm prompts')
+  .option('--name <name>', 'Template name (skip prompt)')
+  .option('--desc <description>', 'Template description (skip prompt)')
   .action(async (pathArg, options) => {
-    await learn(pathArg, null, options.ignore);
+    await learn(pathArg, null, options);
   });
 
 program
   .command('update <template> [path]')
   .description('Update an existing template from a directory')
   .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
+  .option('-y, --yes', 'Automatically confirm prompts')
+  .option('--desc <description>', 'Template description (skip prompt)')
   .action(async (templateName, sourcePath, options) => {
-    await learn(sourcePath || '.', templateName, options.ignore);
+    await learn(sourcePath || '.', templateName, options);
   });
 
 program
@@ -32,8 +37,10 @@ program
   .description('Initialize a new project from a learned template')
   .option('--skip-post-config', 'Skip running post-config prompt')
   .option('--dry-run', 'Show what would be created without making changes')
+  .option('-y, --yes', 'Automatically answer yes to prompts')
+  .option('--vars <variables>', 'Comma-separated key=value variables (e.g. key1=val1,key2=val2)')
   .action(async (typeName, destPath, options) => {
-    await init(typeName, destPath, options.skipPostConfig, options.dryRun);
+    await init(typeName, destPath, options);
   });
 
 program
@@ -97,7 +104,8 @@ program
   .command('remove <template>')
   .alias('rm')
   .description('Remove a learned template from the config')
-  .action(async (templateName) => {
+  .option('-y, --yes', 'Automatically confirm removal')
+  .action(async (templateName, options) => {
     const { loadConfig, saveConfig } = require('./config.js');
     const config = loadConfig();
     const inquirer = (await import('inquirer')).default;
@@ -107,12 +115,16 @@ program
       process.exit(1);
     }
 
-    const { confirmRemoval } = await inquirer.prompt({
-      type: 'confirm',
-      name: 'confirmRemoval',
-      message: `Are you sure you want to remove template "${templateName}"?`,
-      default: false
-    });
+    let confirmRemoval = options.yes;
+    if (!confirmRemoval) {
+      const response = await inquirer.prompt({
+        type: 'confirm',
+        name: 'confirmRemoval',
+        message: `Are you sure you want to remove template "${templateName}"?`,
+        default: false
+      });
+      confirmRemoval = response.confirmRemoval;
+    }
 
     if (confirmRemoval) {
       delete config.templates[templateName];

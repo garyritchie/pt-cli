@@ -12,10 +12,9 @@ export async function runPostConfig(
   destPath: string,
   tasks: PostConfigTask[],
   projectType: string,
-  skipPostConfig: boolean = false,
-  dryRun: boolean = false
+  options: any = {}
 ): Promise<void> {
-  if (skipPostConfig) return;
+  if (options.skipPostConfig) return;
 
   // 1. Filter tasks by type
   const applicableTasks = tasks.filter(t => !t.type || t.type === projectType);
@@ -24,10 +23,12 @@ export async function runPostConfig(
     return;
   }
 
-  // 2. Ask user (skip in dryRun)
+  // 2. Ask user (skip in dryRun or yes mode)
   let run = false;
-  if (dryRun) {
+  if (options.dryRun) {
     console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
+    run = true;
+  } else if (options.yes) {
     run = true;
   } else {
     const response = await inquirer.prompt({
@@ -47,7 +48,7 @@ export async function runPostConfig(
     const progress = `[${i + 1}/${applicableTasks.length}]`;
 
     if (task.command) {
-      if (dryRun) {
+      if (options.dryRun) {
         console.log(chalk.gray(`  [DRY RUN] Would run: ${task.command}`));
       } else {
         try {
@@ -64,7 +65,7 @@ export async function runPostConfig(
     }
 
     if (task.script) {
-      if (dryRun) {
+      if (options.dryRun) {
         console.log(chalk.gray(`  [DRY RUN] Would run script: ${task.script}`));
       } else {
         try {

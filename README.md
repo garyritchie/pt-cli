@@ -1,6 +1,6 @@
 # pt - Project Template CLI
 
-A CLI tool for learning directory structures as templates and initializing new projects from them.
+A CLI tool to record directory structures as templates and initialize new projects from them.
 
 ## Features
 
@@ -12,6 +12,7 @@ A CLI tool for learning directory structures as templates and initializing new p
 - Copy additional files from template with variable substitution (`copy_files`)
 - Auto-detect executable scripts for `post_copy` during `pt learn`
 - Built-in file/folder exclusion patterns
+- Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation
 - `--skip-post-config` flag to bypass post-config prompt
 - `--dry-run` flag to preview `pt init` actions without creating files
 - `pt remove` command to delete unwanted templates
@@ -64,6 +65,9 @@ pt learn /path/to/project --ignore=DAILIES/*,PARKING_LOT/*,REFERENCE/*
 
 # Ignore a folder name at any depth
 pt learn /path/to/project --ignore=**/.godot/
+
+# Non-interactive mode (useful for AI agents)
+pt learn /path/to/project --name my_template --desc "My new template" --yes
 ```
 
 ### Initialize a project
@@ -77,6 +81,9 @@ pt init <template_name> /path/to/new/project --skip-post-config
 
 # Dry run (preview actions without execution)
 pt init <template_name> /path/to/new/project --dry-run
+
+# Non-interactive mode with variables (useful for AI agents)
+pt init <template_name> /path/to/new/project --yes --vars project_name=foo,author=bar
 ```
 
 ### Remove a template
@@ -422,3 +429,11 @@ The CLI flag `--ignore=DAILIES/*,PARKING_LOT/*` merges with the config patterns 
 ### Custom exclusions
 
 Additional patterns can be added to `DEFAULT_EXCLUDES` in `src/config.ts`.
+
+## Agent Integration
+
+`pt-cli` is designed to be highly compatible with AI agents. By utilizing the non-interactive flags (`--yes`, `--vars`, `--name`, `--desc`), agents can autonomously scaffold and learn projects without hanging on interactive terminal prompts.
+
+An official agent skill is included in this repository: [`skills/agency-pt-operator/SKILL.md`](skills/agency-pt-operator/SKILL.md).
+
+Equipping your agent with this skill allows it to automatically use `pt-cli` to lay down standardized boilerplate and capture new architectures you develop together.

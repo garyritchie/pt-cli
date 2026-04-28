@@ -38,3 +38,4 @@ Thumbs.db
 coverage/
 test_*
 *-test*
+scratch/

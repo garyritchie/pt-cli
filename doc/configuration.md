@@ -34,6 +34,8 @@ When learning a template, `pt` scans the source directory for common patterns an
 | `setup.py` or `pyproject.toml` | `pip install -e .`                | python      |
 | `Makefile`                     | `make init`                       | all         |
 
+Additionally, if `pt learn` finds a `post_config.sh` or `post_config.bat` file at the root of the directory, it will parse the scripts and automatically load the tasks into the `post_config` array.
+
 ### The 80% Philosophy
 
 `pt` is designed to get you **80% of the way there** automatically. For complex templates, you are encouraged to:
@@ -243,7 +245,8 @@ Each entry supports:
 
 During `pt init`:
 
-1. **Create folder structure** — folders and `.info.md` files
+1. **Create folder structure** — folders and `.info.md` inside directories
 2. **Copy `copy_files`** — with optional variable substitution and chmod
 3. **Copy `post_copy`** — executable scripts (auto-detected or manual)
-4. **Execute post-config tasks** — shell commands
+4. **Generate sharing metadata** — root `.info.md` and `post_config.sh`/`post_config.bat` are created so the result can be easily shared as a template
+5. **Execute post-config tasks** — shell commands

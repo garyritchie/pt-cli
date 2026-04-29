@@ -53,3 +53,12 @@ pt config
 ```
 
 Shows all templates, their `post_config` tasks (if any), source paths, and an example post-config block.
+
+## Template Sharing
+
+You can share your templates with others simply by sharing a directory (or a ZIP of it). When someone else runs `pt learn` on it, `pt` will automatically detect the following files at the root:
+
+- `.info.md`: Used to automatically set the template's name (from the first `# Heading`) and description.
+- `post_config.sh` or `post_config.bat`: Parsed to automatically populate the `post_config` actions in the user's `config.yaml`.
+
+These files are also automatically generated at the root of a new project whenever you run `pt init`, making it trivial to initialize a project, zip it up, and share it with teammates as a fully-featured template!

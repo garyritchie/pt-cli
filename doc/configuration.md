@@ -1,0 +1,249 @@
+# Configuration
+
+Config is stored at `~/.pt/config.yaml` and contains:
+
+- `version`: Config version
+- `templates`: Dictionary of learned templates with folder structure, `templateRoot`, `copy_files`, `post_copy`, and `post_config`
+
+## Template Variables
+
+When learning a template, you can define variables that will be prompted during initialization:
+
+```bash
+# Learn with variables
+pt learn /path/to/project
+# When prompted: Define template variables? (y/n)
+# Enter variables as comma-separated names: client_name,project_name
+```
+
+These variables are then used during `copy_files` operations to replace `{{variable_name}}` placeholders in copied files.
+
+## Post-Config Tasks
+
+Post-config tasks are optional commands that run after a project is initialized. They can be defined in a template or auto-detected from the source directory.
+
+**Auto-detection** (`pt learn`):
+
+When learning a template, `pt` scans the source directory for common patterns and suggests post-config tasks:
+
+| Pattern                        | Auto-detected task                | Type filter |
+| ------------------------------ | --------------------------------- | ----------- |
+| `.git/`                        | `git init`                        | all         |
+| `package.json`                 | `npm install`                     | javascript  |
+| `requirements.txt`             | `pip install -r requirements.txt` | python      |
+| `setup.py` or `pyproject.toml` | `pip install -e .`                | python      |
+| `Makefile`                     | `make init`                       | all         |
+
+### The 80% Philosophy
+
+`pt` is designed to get you **80% of the way there** automatically. For complex templates, you are encouraged to:
+
+1. Use `pt learn` to capture the basic structure and key boilerplate.
+2. Manually edit `~/.pt/config.yaml` to refine `copy_files`, `post_config` commands, or add specific `chmod` requirements.
+3. Alternatively, initialize a temporary project from your learned template (`pt init`), refine it manually, and then use `pt update` from that directory to "re-learn" the refined state.
+
+```
+javascript:  [git init, npm install]
+python:      [git init, python -m venv .venv, pip install -r requirements.txt]
+godot:       [git init, git lfs install]
+blender:     [git init, git lfs install]
+documentation: [git init]
+default:     [git init]
+```
+
+**Manual definition** in `config.yaml`:
+
+```yaml
+templates:
+  my_template:
+    name: My Project
+    type: javascript
+    post_config:
+      - command: "git init"
+        description: "Initialize git repository"
+      - command: "npm install"
+        description: "Install npm dependencies"
+        type: "javascript"
+      - command: "git lfs install"
+        description: "Install git-lfs hooks"
+        always_prompt: true
+      - script: "bin/setup.sh"
+        description: "Run custom setup script"
+```
+
+Each task supports:
+
+| Field            | Description                                                                      |
+| ---------------- | -------------------------------------------------------------------------------- |
+| `command`        | Shell command to run (auto-selected shell: `cmd /c` on Windows, `sh -c` on Unix) |
+| `description`    | Shown to user during prompt                                                      |
+| `type`           | Filter by project type (e.g., `javascript`)                                      |
+| `always_prompt`  | If `true`, ask per-task even if user says "yes"                                  |
+| `script`         | Path to script relative to template root                                         |
+| `cross_platform` | If `true`, use platform-safe runner                                              |
+
+**Interaction flow** during `pt init`:
+
+1. Folder structure created
+2. If template has `post_config`:
+   - Filter tasks by project type
+   - Show list: `[1/3] git init` ...
+   - Prompt: `Run post-config tasks? (y/N)`
+   - If yes: run each task, show ✓/✗ per task
+3. If no `post_config`, suggest baked-in defaults:
+   - Prompt: `No post-config defined. Use suggested tasks?`
+4. If `--skip-post-config` flag: skip entirely
+
+**Error handling**:
+
+- Missing template files: warn and skip
+- Command not found: catch error, log `✗`, continue to next task
+- Git already initialized: caught silently
+- Permission errors: caught and logged
+- If all tasks fail: warn but don't block project creation
+
+## Copy Files
+
+Copy additional files from the template source directory with optional variable substitution and chmod:
+
+```yaml
+templates:
+  my_template:
+    name: My Project
+    type: javascript
+    copy_files:
+      - src: "templates/config.template"
+        dest: "config.json"
+        substitute_variables: true
+      - src: "scripts/setup.sh"
+        dest: "bin/setup.sh"
+        chmod: "0755"
+```
+
+Each entry supports:
+
+| Field                  | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| `src`                  | Path relative to template root (source directory from `pt learn`) |
+| `dest`                 | Path relative to project root                                     |
+| `substitute_variables` | If `true`, replace `{{variable_name}}` placeholders               |
+| `chmod`                | Octal permission string (e.g., `"0755"`) — skipped on Windows     |
+
+**How it works**:
+
+1. Read file from `templateRoot/src`
+2. If `substitute_variables`: replace `{{var}}` patterns with user-provided values
+3. Write to `projectRoot/dest` (creates intermediate directories)
+4. Apply `chmod` on Unix systems
+
+**Edge cases**:
+
+- Missing source file: warn and skip
+- Template root not set: skip silently (learn stores this)
+- Permission errors: caught and logged
+
+### Example: Variable Substitution
+
+A plausible scenario for customizing a new project's `package.json` and `README.md`:
+
+**1. Define in `config.yaml`**:
+```yaml
+templates:
+  node_web_app:
+    description: "A standard Node.js web application"
+    variables:
+      - name: "project_name"
+        prompt: "What is the project name?"
+        default: "my-app"
+      - name: "author_name"
+        prompt: "Who is the author?"
+        required: true
+    copy_files:
+      - src: "templates/package.json.tmpl"
+        dest: "package.json"
+        substitute_variables: true
+```
+
+**2. Template source (`templates/package.json.tmpl`)**:
+```json
+{
+  "name": "{{project_name}}",
+  "author": "{{author_name}}",
+  "version": "1.0.0"
+}
+```
+
+**3. Resulting project file**:
+If the user enters `my-service` and `Jane Doe`, the file `package.json` will be created with:
+```json
+{
+  "name": "my-service",
+  "author": "Jane Doe",
+  "version": "1.0.0"
+}
+```
+
+## Post-Copy
+
+Auto-detect executable scripts during `pt learn` and copy them to the new project:
+
+**Auto-detection** (`pt learn`):
+
+When learning a template, `pt` scans the source directory root for executable files:
+
+| Pattern                | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| `*.sh`                 | Shell scripts                                       |
+| `*.py`                 | Python scripts                                      |
+| `*.bat` / `*.cmd`      | Batch files                                         |
+| `Makefile`             | Makefiles                                           |
+| `*.mk`                 | Makefile includes                                   |
+| (no ext, has exec bit) | Any executable file (checks execute permission bit) |
+
+The detected files are presented to the user for confirmation:
+
+```
+Auto-detected executable files:
+  - bin/deploy.sh (shell script)
+  - scripts/lint.py (Python script)
+  - Makefile (makefile)
+
+Add to post_copy? (y/N):
+```
+
+**Manual definition** in `config.yaml`:
+
+```yaml
+templates:
+  my_template:
+    name: My Project
+    post_copy:
+      - src: "bin/deploy.sh"
+        dest: "bin/deploy.sh"
+      - src: "scripts/lint.py"
+        dest: "scripts/lint.py"
+```
+
+Each entry supports:
+
+| Field  | Description                                                       |
+| ------ | ----------------------------------------------------------------- |
+| `src`  | Path relative to template root (source directory from `pt learn`) |
+| `dest` | Path relative to project root (defaults to `src` if omitted)      |
+
+**How it works**:
+
+1. During `pt init`, copies each `post_copy` file from `templateRoot/src` to `projectRoot/dest`
+2. Auto-applies `0755` chmod for `.sh`, `.py`, `.bash`, `.bat` files
+3. Missing files: warn and skip, don't block project creation
+
+**vs copy_files**: `post_copy` is a simplified variant specifically for executables/scripts, auto-detected by `pt learn`. `copy_files` is for arbitrary template files with variable substitution support.
+
+## Order of Operations
+
+During `pt init`:
+
+1. **Create folder structure** — folders and `.info.md` files
+2. **Copy `copy_files`** — with optional variable substitution and chmod
+3. **Copy `post_copy`** — executable scripts (auto-detected or manual)
+4. **Execute post-config tasks** — shell commands

@@ -22,6 +22,22 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const isUpdate = !!updateTemplate;
   const config = loadConfig();
   const existingNames = getTemplateNames(config);
+
+  // Check for .info.md
+  let infoName = '';
+  let infoDesc = '';
+  const infoPath = path.join(resolvedPath, '.info.md');
+  if (fs.existsSync(infoPath)) {
+    const infoContent = fs.readFileSync(infoPath, 'utf-8');
+    const lines = infoContent.split('\n');
+    for (const line of lines) {
+      if (line.startsWith('# ')) {
+        infoName = line.substring(2).trim();
+      } else if (line.trim() !== '' && !infoDesc && !line.startsWith('#')) {
+        infoDesc = line.trim();
+      }
+    }
+  }
   
   let targetName: string = updateTemplate || '';
   
@@ -33,6 +49,9 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   } else {
     if (options.name) {
       targetName = options.name;
+    } else if (infoName) {
+      targetName = infoName;
+      console.log(chalk.cyan(`Auto-detected template name from .info.md: ${targetName}`));
     } else {
       const { newName } = await inquirer.prompt({
         type: 'input',
@@ -72,7 +91,10 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       }
     }
   } else {
-    if (options.yes) {
+    if (infoDesc) {
+      description = infoDesc;
+      console.log(chalk.cyan(`Auto-detected template description from .info.md: ${description}`));
+    } else if (options.yes) {
       description = targetName;
     } else {
       const { newDesc } = await inquirer.prompt({
@@ -185,6 +207,38 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     copy_files: copy_files,
     variables: variables.length > 0 ? variables : undefined
   };
+
+  // Check for post_config scripts
+  const postConfigTasks: any[] = [];
+  const shPath = path.join(resolvedPath, 'post_config.sh');
+  const batPath = path.join(resolvedPath, 'post_config.bat');
+  if (fs.existsSync(shPath)) {
+    const lines = fs.readFileSync(shPath, 'utf-8').split('\n');
+    let currentDesc = '';
+    for (const line of lines) {
+      if (line.startsWith('echo "Running: ')) {
+        currentDesc = line.substring(15, line.length - 1).replace(/"$/, '');
+      } else if (line.trim() && !line.startsWith('#') && !line.startsWith('echo ')) {
+        postConfigTasks.push({ command: line.trim(), description: currentDesc || line.trim() });
+        currentDesc = '';
+      }
+    }
+  } else if (fs.existsSync(batPath)) {
+    const lines = fs.readFileSync(batPath, 'utf-8').split('\n');
+    let currentDesc = '';
+    for (const line of lines) {
+      if (line.startsWith('echo Running: ')) {
+        currentDesc = line.substring(14).trim();
+      } else if (line.trim() && !line.startsWith('::') && !line.startsWith('@echo') && !line.startsWith('echo ')) {
+        postConfigTasks.push({ command: line.trim(), description: currentDesc || line.trim() });
+        currentDesc = '';
+      }
+    }
+  }
+  if (postConfigTasks.length > 0) {
+    templateConfig.post_config = postConfigTasks;
+    console.log(chalk.cyan(`Auto-detected ${postConfigTasks.length} post_config action(s) from script.`));
+  }
 
   // 3. Detect executables at root
   const detectedExecutables: string[] = [];

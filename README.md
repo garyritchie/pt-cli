@@ -18,6 +18,7 @@ A CLI tool to record directory structures as templates and initialize new projec
 - Define template variables for dynamic file customization
 - Auto-detect and suggest post-config setup tasks
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
+- Easily package and share templates with auto-generated metadata files
 - Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation
 
 ## Quick Start

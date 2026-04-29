@@ -163,6 +163,34 @@ export async function init(targetName: string | undefined, destPath: string | un
       }
     }
   }
+  // Write .info.md
+  if (!options.dryRun) {
+    const infoContent = `# ${typeName}\n\n${template.description || ''}\n`;
+    fs.writeFileSync(path.join(resolvedDest, '.info.md'), infoContent);
+  } else {
+    console.log(chalk.gray(`  [DRY RUN] Would create .info.md`));
+  }
+
+  // Write post_config scripts
+  if (template.post_config && template.post_config.length > 0) {
+    if (!options.dryRun) {
+      let bashContent = '#!/bin/bash\n# Auto-generated post_config script\n\n';
+      let batContent = '@echo off\n:: Auto-generated post_config script\n\n';
+      for (const task of template.post_config) {
+        const cmd = task.command || (task.script ? `./${task.script}` : '');
+        if (cmd) {
+          bashContent += `echo "Running: ${task.description || cmd}"\n${cmd}\n`;
+          batContent += `echo Running: ${task.description || cmd}\n${cmd}\n`;
+        }
+      }
+      fs.writeFileSync(path.join(resolvedDest, 'post_config.sh'), bashContent);
+      try { fs.chmodSync(path.join(resolvedDest, 'post_config.sh'), 0o755); } catch(e) {}
+      fs.writeFileSync(path.join(resolvedDest, 'post_config.bat'), batContent);
+    } else {
+      console.log(chalk.gray(`  [DRY RUN] Would create post_config.sh and post_config.bat`));
+    }
+  }
+
   // 4. Run post-config tasks
   if (template.post_config) {
     await runPostConfig(resolvedDest, template.post_config, typeName!, options);

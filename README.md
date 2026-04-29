@@ -2,437 +2,63 @@
 
 A CLI tool to record directory structures as templates and initialize new projects from them.
 
-## Features
+## The Pipeline Benefit
+
+`pt-cli` is built to reduce boilerplate setup and ensure consistency across your workspaces. In a production pipeline, standardization is key to lowering the friction of cognitive load. `pt` helps by:
+
+- **Instantly replicating proven architectures:** Stop recreating folder structures manually. `pt learn` saves the shape of any project.
+- **Automating the setup grind:** With post-config tasks, `pt init` can automatically run `npm install`, `git init`, or setup python virtual environments for you.
+- **Agentic automation:** Fully supports headless operation via non-interactive flags and includes a skill for integration with AI agents.
+- **File copying & templating:** Beyond directories, it allows injecting variables into key files (`package.json`, `README.md`, etc.) and automatically ports over executable scripts.
+
+## Features at a Glance
 
 - Learn any directory structure and save it as a reusable template
 - Initialize new projects from learned templates
-- Define template variables for customization
-- Auto-detect and suggest post-config tasks during `pt learn`
+- Define template variables for dynamic file customization
+- Auto-detect and suggest post-config setup tasks
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
-- Copy additional files from template with variable substitution (`copy_files`)
-- Auto-detect executable scripts for `post_copy` during `pt learn`
-- Built-in file/folder exclusion patterns
 - Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation
-- `--skip-post-config` flag to bypass post-config prompt
-- `--dry-run` flag to preview `pt init` actions without creating files
-- `pt remove` command to delete unwanted templates
-- Enhanced `pt config` output (shows templateRoot, post_config, post_copy)
-- YAML-based configuration at `~/.pt/config.yaml`
 
-## Installation
+## Quick Start
 
-### Prerequisites
-
-- Node.js 16+
-- npm 8+
-
-### Setup
+### Installation
 
 ```bash
+# Clone and setup
 cd pt-cli
 npm install
 npm run build
-```
 
-### Usage (global)
-
-```bash
+# Link for global use
 npm link
 ```
 
-This makes `pt` available globally.
-
-### Usage (local)
+### Basic Commands
 
 ```bash
-pt <command>
-```
-
-## Usage
-
-### Learn a template
-
-```bash
-# Learn a new template (auto-detects post-config tasks)
+# Learn an existing project structure
 pt learn /path/to/project
 
-# Update an existing template (use current directory if no path given)
-pt update <template_name>
-pt update <template_name> /path/to/project
-
-# Ignore specific folders during learning
-pt learn /path/to/project --ignore=DAILIES/*,PARKING_LOT/*,REFERENCE/*
-
-# Ignore a folder name at any depth
-pt learn /path/to/project --ignore=**/.godot/
-
-# Non-interactive mode (useful for AI agents)
-pt learn /path/to/project --name my_template --desc "My new template" --yes
-```
-
-### Initialize a project
-
-```bash
-# Initialize from a template (auto-suggests post-config tasks)
+# Scaffold a new project from a template
 pt init <template_name> /path/to/new/project
 
-# Skip post-config tasks
-pt init <template_name> /path/to/new/project --skip-post-config
-
-# Dry run (preview actions without execution)
-pt init <template_name> /path/to/new/project --dry-run
-
-# Non-interactive mode with variables (useful for AI agents)
-pt init <template_name> /path/to/new/project --yes --vars project_name=foo,author=bar
-```
-
-### Remove a template
-
-```bash
-# Remove a learned template (asks for confirmation)
-pt remove <template_name>
-
-# Short alias
-pt rm <template_name>
-```
-
-### Show config and templates
-
-```bash
+# List available templates and configurations
 pt config
 ```
 
-Shows all templates, their `post_config` tasks (if any), source paths, and an example post-config block.
+## Documentation
 
-## Configuration
+For full details on usage, configurations, and exclusions, please refer to the documents in the `doc/` directory:
 
-Config is stored at `~/.pt/config.yaml` and contains:
-
-- `version`: Config version
-- `templates`: Dictionary of learned templates with folder structure, `templateRoot`, `copy_files`, `post_copy`, and `post_config`
-
-### Template Variables
-
-When learning a template, you can define variables that will be prompted during initialization:
-
-```bash
-# Learn with variables
-pt learn /path/to/project
-# When prompted: Define template variables? (y/n)
-# Enter variables as comma-separated names: client_name,project_name
-```
-
-These variables are then used during `copy_files` operations to replace `{{variable_name}}` placeholders in copied files.
-
-### Post-Config Tasks
-
-Post-config tasks are optional commands that run after a project is initialized. They can be defined in a template or auto-detected from the source directory.
-
-**Auto-detection** (`pt learn`):
-
-When learning a template, `pt` scans the source directory for common patterns and suggests post-config tasks:
-
-| Pattern                        | Auto-detected task                | Type filter |
-| ------------------------------ | --------------------------------- | ----------- |
-| `.git/`                        | `git init`                        | all         |
-| `package.json`                 | `npm install`                     | javascript  |
-| `requirements.txt`             | `pip install -r requirements.txt` | python      |
-| `setup.py` or `pyproject.toml` | `pip install -e .`                | python      |
-| `Makefile`                     | `make init`                       | all         |
-
-### The 80% Philosophy
-
-`pt` is designed to get you **80% of the way there** automatically. For complex templates, you are encouraged to:
-
-1. Use `pt learn` to capture the basic structure and key boilerplate.
-2. Manually edit `~/.pt/config.yaml` to refine `copy_files`, `post_config` commands, or add specific `chmod` requirements.
-3. Alternatively, initialize a temporary project from your learned template (`pt init`), refine it manually, and then use `pt update` from that directory to "re-learn" the refined state.
-
-```
-javascript:  [git init, npm install]
-python:      [git init, python -m venv .venv, pip install -r requirements.txt]
-godot:       [git init, git lfs install]
-blender:     [git init, git lfs install]
-documentation: [git init]
-default:     [git init]
-```
-
-**Manual definition** in `config.yaml`:
-
-```yaml
-templates:
-  my_template:
-    name: My Project
-    type: javascript
-    post_config:
-      - command: "git init"
-        description: "Initialize git repository"
-      - command: "npm install"
-        description: "Install npm dependencies"
-        type: "javascript"
-      - command: "git lfs install"
-        description: "Install git-lfs hooks"
-        always_prompt: true
-      - script: "bin/setup.sh"
-        description: "Run custom setup script"
-```
-
-Each task supports:
-
-| Field            | Description                                                                      |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `command`        | Shell command to run (auto-selected shell: `cmd /c` on Windows, `sh -c` on Unix) |
-| `description`    | Shown to user during prompt                                                      |
-| `type`           | Filter by project type (e.g., `javascript`)                                      |
-| `always_prompt`  | If `true`, ask per-task even if user says "yes"                                  |
-| `script`         | Path to script relative to template root                                         |
-| `cross_platform` | If `true`, use platform-safe runner                                              |
-
-**Interaction flow** during `pt init`:
-
-1. Folder structure created
-2. If template has `post_config`:
-   - Filter tasks by project type
-   - Show list: `[1/3] git init` ...
-   - Prompt: `Run post-config tasks? (y/N)`
-   - If yes: run each task, show ✓/✗ per task
-3. If no `post_config`, suggest baked-in defaults:
-   - Prompt: `No post-config defined. Use suggested tasks?`
-4. If `--skip-post-config` flag: skip entirely
-
-**Error handling**:
-
-- Missing template files: warn and skip
-- Command not found: catch error, log `✗`, continue to next task
-- Git already initialized: caught silently
-- Permission errors: caught and logged
-- If all tasks fail: warn but don't block project creation
-
-### Copy Files
-
-Copy additional files from the template source directory with optional variable substitution and chmod:
-
-```yaml
-templates:
-  my_template:
-    name: My Project
-    type: javascript
-    copy_files:
-      - src: "templates/config.template"
-        dest: "config.json"
-        substitute_variables: true
-      - src: "scripts/setup.sh"
-        dest: "bin/setup.sh"
-        chmod: "0755"
-```
-
-Each entry supports:
-
-| Field                  | Description                                                       |
-| ---------------------- | ----------------------------------------------------------------- |
-| `src`                  | Path relative to template root (source directory from `pt learn`) |
-| `dest`                 | Path relative to project root                                     |
-| `substitute_variables` | If `true`, replace `{{variable_name}}` placeholders               |
-| `chmod`                | Octal permission string (e.g., `"0755"`) — skipped on Windows     |
-
-**How it works**:
-
-1. Read file from `templateRoot/src`
-2. If `substitute_variables`: replace `{{var}}` patterns with user-provided values
-3. Write to `projectRoot/dest` (creates intermediate directories)
-4. Apply `chmod` on Unix systems
-
-**Edge cases**:
-
-- Missing source file: warn and skip
-- Template root not set: skip silently (learn stores this)
-- Permission errors: caught and logged
-
-#### Example: Variable Substitution
-
-A plausible scenario for customizing a new project's `package.json` and `README.md`:
-
-**1. Define in `config.yaml`**:
-```yaml
-templates:
-  node_web_app:
-    description: "A standard Node.js web application"
-    variables:
-      - name: "project_name"
-        prompt: "What is the project name?"
-        default: "my-app"
-      - name: "author_name"
-        prompt: "Who is the author?"
-        required: true
-    copy_files:
-      - src: "templates/package.json.tmpl"
-        dest: "package.json"
-        substitute_variables: true
-```
-
-**2. Template source (`templates/package.json.tmpl`)**:
-```json
-{
-  "name": "{{project_name}}",
-  "author": "{{author_name}}",
-  "version": "1.0.0"
-}
-```
-
-**3. Resulting project file**:
-If the user enters `my-service` and `Jane Doe`, the file `package.json` will be created with:
-```json
-{
-  "name": "my-service",
-  "author": "Jane Doe",
-  "version": "1.0.0"
-}
-```
-
-### Post-Copy
-
-Auto-detect executable scripts during `pt learn` and copy them to the new project:
-
-**Auto-detection** (`pt learn`):
-
-When learning a template, `pt` scans the source directory root for executable files:
-
-| Pattern                | Description                                         |
-| ---------------------- | --------------------------------------------------- |
-| `*.sh`                 | Shell scripts                                       |
-| `*.py`                 | Python scripts                                      |
-| `*.bat` / `*.cmd`      | Batch files                                         |
-| `Makefile`             | Makefiles                                           |
-| `*.mk`                 | Makefile includes                                   |
-| (no ext, has exec bit) | Any executable file (checks execute permission bit) |
-
-The detected files are presented to the user for confirmation:
-
-```
-Auto-detected executable files:
-  - bin/deploy.sh (shell script)
-  - scripts/lint.py (Python script)
-  - Makefile (makefile)
-
-Add to post_copy? (y/N):
-```
-
-**Manual definition** in `config.yaml`:
-
-```yaml
-templates:
-  my_template:
-    name: My Project
-    post_copy:
-      - src: "bin/deploy.sh"
-        dest: "bin/deploy.sh"
-      - src: "scripts/lint.py"
-        dest: "scripts/lint.py"
-```
-
-Each entry supports:
-
-| Field  | Description                                                       |
-| ------ | ----------------------------------------------------------------- |
-| `src`  | Path relative to template root (source directory from `pt learn`) |
-| `dest` | Path relative to project root (defaults to `src` if omitted)      |
-
-**How it works**:
-
-1. During `pt init`, copies each `post_copy` file from `templateRoot/src` to `projectRoot/dest`
-2. Auto-applies `0755` chmod for `.sh`, `.py`, `.bash`, `.bat` files
-3. Missing files: warn and skip, don't block project creation
-
-**vs copy_files**: `post_copy` is a simplified variant specifically for executables/scripts, auto-detected by `pt learn`. `copy_files` is for arbitrary template files with variable substitution support.
-
-### Order of Operations
-
-During `pt init`:
-
-1. **Create folder structure** — folders and `.info.md` files
-2. **Copy `copy_files`** — with optional variable substitution and chmod
-3. **Copy `post_copy`** — executable scripts (auto-detected or manual)
-4. **Execute post-config tasks** — shell commands
-
-## Development
-
-### Build
-
-```bash
-npm run build
-```
-
-### Watch mode
-
-```bash
-npm run watch
-```
-
-### Lint
-
-```bash
-npm run lint
-```
-
-## Project Structure
-
-```
-pt-cli/
-├── bin/          # CLI entry point
-├── src/          # TypeScript source
-│   ├── config.ts       # Config management, exclusion logic, type definitions
-│   ├── learn.ts        # Template learning logic + templateRoot storage + executable auto-detection
-│   ├── init.ts         # Project initialization + copy_files/post_copy/post_config wiring
-│   ├── postconfig.ts   # Post-config runner + baked-in defaults
-│   ├── substitute.ts   # Variable substitution + processCopyFiles
-│   ├── platform.ts     # Cross-platform shell detection
-│   └── index.ts        # CLI command definitions
-├── dist/         # Compiled JavaScript (generated)
-├── package.json
-├── tsconfig.json
-├── post-config_PLAN.md # Feature plan and implementation tracking
-└── ROADMAP.md      # Project roadmap
-```
-
-## Exclusions
-
-The following are excluded by default when learning templates:
-
-- `.git`, `node_modules`, `dist`, `build`
-- `.DS_Store`, `.pytest_cache`, `__pycache__`
-- `.vscode`, `.idea`
-- Various editor/IDE files (`.bak`, `.swp`, etc.)
-- Compiled files (`.pyc`, `.so`, `.dll`, etc.)
-- `.gitkeep.md`, `.info.md`, `.vale.ini`, `.gitattributes`
-
-### Ignore Patterns
-
-Use the top-level `ignore` key in `~/.pt/config.yaml` or the `--ignore` flag to exclude folders:
-
-```yaml
-ignore:
-  - DAILIES/*
-  - PARKING_LOT/*
-  - REFERENCE/*
-```
-
-Patterns use wildcards for clarity:
-
-| Pattern      | Effect                                                                       |
-| ------------ | ---------------------------------------------------------------------------- |
-| `DAILIES/*`  | Ignore all contents of DAILIES (DAILIES itself is kept as a template folder) |
-| `DAILIES/**` | Same as `DAILIES/*` (deep match)                                             |
-| `NODE`       | Ignore this specific folder only (no wildcard = exact match)                 |
-
-The CLI flag `--ignore=DAILIES/*,PARKING_LOT/*` merges with the config patterns (one-shot, not persistent).
-
-### Custom exclusions
-
-Additional patterns can be added to `DEFAULT_EXCLUDES` in `src/config.ts`.
+- [Detailed Usage](doc/usage.md) - Learn, Initialize, Update, and Remove commands.
+- [Configuration Guide](doc/configuration.md) - Template variables, post-config tasks, file copying, and more.
+- [Exclusions](doc/exclusions.md) - Learn about default ignored files and how to set custom patterns.
+- [Development](doc/development.md) - How to build, lint, and understand the project structure.
 
 ## Agent Integration
 
-`pt-cli` is designed to be highly compatible with AI agents. By utilizing the non-interactive flags (`--yes`, `--vars`, `--name`, `--desc`), agents can autonomously scaffold and learn projects without hanging on interactive terminal prompts.
+`pt-cli` is compatible with AI agents. By utilizing the non-interactive flags (`--yes`, `--vars`, `--name`, `--desc`), agents can autonomously scaffold and learn projects without hanging on interactive terminal prompts.
 
 An official agent skill is included in this repository: [`skills/agency-pt-operator/SKILL.md`](skills/agency-pt-operator/SKILL.md).
 

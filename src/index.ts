@@ -109,6 +109,23 @@ program
   });
 
 program
+  .command('ignore [patterns]')
+  .description('View or set global ignore patterns (comma-separated)')
+  .option('--set', 'Set the ignore patterns to the provided value')
+  .action((patterns, options) => {
+    const { loadConfig, saveConfig } = require('./config.js');
+    const config = loadConfig();
+    
+    if (options.set) {
+      config.ignore = patterns ? patterns.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '') : [];
+      saveConfig(config);
+      console.log('Ignore patterns updated:', config.ignore);
+    } else {
+      console.log('Current ignore patterns:', config.ignore || []);
+    }
+  });
+
+program
   .command('add <name> [json]')
   .description('Add or update a template from JSON string or file')
   .option('-f, --file <path>', 'Path to JSON file containing template data')

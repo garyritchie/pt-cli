@@ -98,8 +98,8 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     if (infoDesc) {
       description = infoDesc;
       if (!options.json) console.log(chalk.cyan(`Auto-detected template description from .info.md: ${description}`));
-    } else if (options.yes) {
-      description = targetName;
+    } else if (options.yes || options.json) {
+      description = infoDesc || '';
     } else {
       const { newDesc } = await inquirer.prompt({
         type: 'input',
@@ -277,7 +277,11 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
 
   if (options.json) {
-    console.log(JSON.stringify(templateConfig, null, 2));
+    const output = {
+      name: targetName,
+      ...templateConfig
+    };
+    console.log(JSON.stringify(output, null, 2));
     return;
   }
 

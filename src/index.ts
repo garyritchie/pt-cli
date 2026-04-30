@@ -109,6 +109,37 @@ program
   });
 
 program
+  .command('add <name> [json]')
+  .description('Add or update a template from JSON string or file')
+  .option('-f, --file <path>', 'Path to JSON file containing template data')
+  .action((name, jsonStr, options) => {
+    const { loadConfig, saveConfig } = require('./config.js');
+    const config = loadConfig();
+    try {
+      let data;
+      if (options.file) {
+        const fs = require('fs');
+        const path = require('path');
+        const filePath = path.resolve(options.file);
+        data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      } else if (jsonStr) {
+        data = JSON.parse(jsonStr);
+      } else {
+        console.error('Error: Either a JSON string or --file <path> must be provided.');
+        process.exit(1);
+      }
+      
+      if (!config.templates) config.templates = {};
+      config.templates[name] = data;
+      saveConfig(config);
+      console.log(`Template "${name}" saved successfully.`);
+    } catch (e: any) {
+      console.error('Failed to parse template JSON:', e.message);
+      process.exit(1);
+    }
+  });
+
+program
   .command('remove <template>')
   .alias('rm')
   .description('Remove a learned template from the config')

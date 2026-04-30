@@ -51,15 +51,19 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       targetName = options.name;
     } else if (infoName) {
       targetName = infoName;
-      console.log(chalk.cyan(`Auto-detected template name from .info.md: ${targetName}`));
+      if (!options.json) console.log(chalk.cyan(`Auto-detected template name from .info.md: ${targetName}`));
     } else {
-      const { newName } = await inquirer.prompt({
-        type: 'input',
-        name: 'newName',
-        message: 'Name this template:',
-        default: path.basename(resolvedPath)
-      });
-      targetName = newName;
+      if (options.yes || options.json) {
+        targetName = path.basename(resolvedPath);
+      } else {
+        const { newName } = await inquirer.prompt({
+          type: 'input',
+          name: 'newName',
+          message: 'Name this template:',
+          default: path.basename(resolvedPath)
+        });
+        targetName = newName;
+      }
     }
   }
 
@@ -93,7 +97,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   } else {
     if (infoDesc) {
       description = infoDesc;
-      console.log(chalk.cyan(`Auto-detected template description from .info.md: ${description}`));
+      if (!options.json) console.log(chalk.cyan(`Auto-detected template description from .info.md: ${description}`));
     } else if (options.yes) {
       description = targetName;
     } else {
@@ -111,7 +115,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const ignorePatterns = [...(config.ignore || []), ...cliIgnore];
 
   let hasVariables = false;
-  if (!options.yes) {
+  if (!options.yes && !options.json) {
     const response = await inquirer.prompt({
       type: 'confirm',
       name: 'hasVariables',
@@ -150,7 +154,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   let selectedFiles: string[] = [];
   let selectedFolders: string[] = [];
   
-  if (options.yes) {
+  if (options.yes || options.json) {
     // If --yes, auto-select the defaults
     selectedFiles = rootFiles.filter(f => ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()));
     selectedFolders = rootDirs.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
@@ -237,7 +241,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
   if (postConfigTasks.length > 0) {
     templateConfig.post_config = postConfigTasks;
-    console.log(chalk.cyan(`Auto-detected ${postConfigTasks.length} post_config action(s) from script.`));
+    if (!options.json) console.log(chalk.cyan(`Auto-detected ${postConfigTasks.length} post_config action(s) from script.`));
   }
 
   // 3. Detect executables at root
@@ -250,12 +254,14 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
 
   if (detectedExecutables.length > 0) {
-    console.log(chalk.cyan("\nAuto-detected " + detectedExecutables.length + " executable file(s) at root:"));
-    for (const file of detectedExecutables) {
-      console.log(chalk.gray("  - " + file));
+    if (!options.json) {
+      console.log(chalk.cyan("\nAuto-detected " + detectedExecutables.length + " executable file(s) at root:"));
+      for (const file of detectedExecutables) {
+        console.log(chalk.gray("  - " + file));
+      }
     }
     let addPostCopy = true;
-    if (!options.yes) {
+    if (!options.yes && !options.json) {
       const response = await inquirer.prompt({
         type: 'confirm',
         name: 'addPostCopy',
@@ -268,6 +274,11 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       templateConfig.post_copy = detectedExecutables.map(f => ({ src: f, dest: f }));
       templateConfig.copy_files = templateConfig.copy_files?.filter(cf => !detectedExecutables.includes(cf.src));
     }
+  }
+
+  if (options.json) {
+    console.log(JSON.stringify(templateConfig, null, 2));
+    return;
   }
 
   config.templates[targetName] = templateConfig;

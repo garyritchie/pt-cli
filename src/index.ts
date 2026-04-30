@@ -18,6 +18,7 @@ program
   .option('-y, --yes', 'Automatically confirm prompts')
   .option('--name <name>', 'Template name (skip prompt)')
   .option('--desc <description>', 'Template description (skip prompt)')
+  .option('--json', 'Output template structure as JSON instead of saving')
   .action(async (pathArg, options) => {
     await learn(pathArg, null, options);
   });
@@ -46,9 +47,16 @@ program
 program
   .command('config')
   .description('Show current config location and list templates')
-  .action(() => {
+  .option('--json', 'Output config as JSON')
+  .action((options) => {
     const { loadConfig, getTemplateNames } = require('./config.js');
     const config = loadConfig();
+    
+    if (options.json) {
+      console.log(JSON.stringify(config, null, 2));
+      return;
+    }
+    
     const names = getTemplateNames(config);
     
     console.log(chalk.cyan('Config Location:'), require('os').homedir() + '/.pt/config.yaml');

@@ -12,9 +12,9 @@
     "start": "ts-node src/index.ts",
     "dev": "ts-node src/index.ts",
     "prepublishOnly": "npm run build",
-    "build:linux":   "bun build ./src/index.ts --compile --target=bun-linux-x64   --outfile ../pt-gui/pt-cli/pt-linux",
-    "build:macos":   "bun build ./src/index.ts --compile --target=bun-darwin-x64  --outfile ../pt-gui/pt-cli/pt-macos",
-    "build:windows": "bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile ../pt-gui/pt-cli/pt-win.exe",
+    "build:linux":   "bun build ./src/index.ts --compile --target=bun-linux-x64   --outfile ../BUILD/pt-cli/pt-linux",
+    "build:macos":   "bun build ./src/index.ts --compile --target=bun-darwin-x64  --outfile ../BUILD/pt-cli/pt-macos",
+    "build:windows": "bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile ../BUILD/pt-cli/pt-win.exe",
     "build:all":     "npm run build:linux && npm run build:macos && npm run build:windows"
   },
   "keywords": [],

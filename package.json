@@ -4,7 +4,7 @@
   "description": "Project Template CLI - Learn structures and initialize projects",
   "main": "dist/index.js",
   "bin": {
-    "pt": "./bin/pt"
+    "pt": "./dist/index.js"
   },
   "type": "commonjs",
   "scripts": {

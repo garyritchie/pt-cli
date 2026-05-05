@@ -2,6 +2,7 @@ const YAML = require('yaml');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const chalk = require('chalk');
 
 export const HOME_DIR = path.join(os.homedir(), '.pt');
 export const CONFIG_PATH = path.join(HOME_DIR, 'config.yaml');
@@ -58,6 +59,7 @@ export interface PtConfig {
   templates: Record<string, TemplateConfig>;
   ignore?: string[];  // top-level folder ignore patterns for pt learn
   global_post_config?: PostConfigTask[];  // global post-config tasks applied to all projects
+  variables?: TemplateVariable[];         // global variables for substitution
 }
 
 export function ensureConfigDir() {
@@ -72,7 +74,8 @@ export function loadConfig(): PtConfig {
     const defaultConfig: PtConfig = {
       version: '3.0',
       templates: {},
-      global_post_config: []
+      global_post_config: [],
+      variables: []
     };
     // Don't automatically save a default config on load.
     // This prevents accidental creation of mostly-empty configs 
@@ -95,6 +98,19 @@ export function loadConfig(): PtConfig {
     // Initialize global_post_config for configs that don't have it
     if (config.global_post_config === undefined) {
       config.global_post_config = [];
+    }
+
+    // Initialize variables for configs that don't have it
+    if (config.variables === undefined) {
+      config.variables = [];
+    } else if (!Array.isArray(config.variables)) {
+      // Migrate from Record<string, string> to TemplateVariable[]
+      const oldVars = config.variables as any;
+      config.variables = Object.entries(oldVars).map(([name, value]) => ({
+        name,
+        prompt: `Enter ${name}:`,
+        default: value as string
+      }));
     }
 
     // Migration from 2.0 to 3.0

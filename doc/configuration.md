@@ -6,6 +6,7 @@ Config is stored at `~/.pt/config.yaml` and contains:
 - `templates`: Dictionary of learned templates with folder structure, `templateRoot`, `copy_files`, `post_copy`, and `post_config`
 - `global_post_config`: Array of post-config tasks applied to **every** project (regardless of template)
 - `ignore`: Global folder ignore patterns for `pt learn`
+- `variables`: Global variable suggestions for `pt learn` (name, prompt, default, required)
 
 ## Template Variables
 
@@ -148,9 +149,42 @@ Each global task supports the same fields as template post-config:
 
 ### Viewing
 
-Run `pt config` to see global post-config tasks listed under "Global Post-Config Tasks:" with their default checked state and optional type filter.
-
 Global tasks cannot be added via `pt add` or `pt learn` — they must be edited directly in `~/.pt/config.yaml`.
+
+## Global Variables
+
+Global variables are defined at the root of `~/.pt/config.yaml`. They serve as **suggestions** when creating or updating templates via `pt learn`.
+
+Unlike global post-config tasks, global variables are **not** automatically applied during `pt init`. Instead, they are "stamped" into individual templates during the learning process. This allows you to maintain a consistent set of metadata (like `author`, `license`, or `version`) across all your project types without forcing those values onto old templates or external configurations.
+
+### Configuration
+
+```yaml
+variables:
+  - name: "author"
+    prompt: "Who is the author?"
+    default: "Gary Ritchie"
+  - name: "license"
+    prompt: "Choose a license:"
+    default: "MIT"
+    required: true
+```
+
+### Behavior
+
+1. **`pt learn`**: When scanning a project to create a new template, `pt` will:
+   - Detect variables from text files using `{{ name }}` syntax.
+   - Inject the **Global Variables** as additional suggestions.
+   - (GUI) Provide a checkbox for each variable row, allowing you to selectively include them in the template.
+   - (CLI) Prompt for each variable definition unless `--yes` is used.
+
+2. **`pt init`**: Project initialization uses only the variables explicitly saved in the chosen template. This ensures that templates are self-contained and portable.
+
+3. **`pt variables`**: Use this command to manage your global variables:
+   - `pt variables`: List current global variables.
+   - `pt variables --set KEY=VAL`: Set/update a global variable's default value.
+   - `pt variables --delete KEY`: Remove a global variable.
+   - `pt variables --set --json '...'`: Bulk update via JSON (primarily for GUI use).
 
 ## Copy Files
 

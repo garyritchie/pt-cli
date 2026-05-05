@@ -109,6 +109,16 @@ program
       }
     }
     
+    // Show global variables
+    if (config.variables && config.variables.length > 0) {
+      console.log(chalk.cyan('\nGlobal Variables:'));
+      for (const v of config.variables) {
+        console.log(chalk.white(`  - ${v.name}:`), chalk.gray(v.default || '(no default)'));
+        if (v.prompt) console.log(chalk.gray(`    Prompt: ${v.prompt}`));
+        if (v.required) console.log(chalk.yellow(`    [Required]`));
+      }
+    }
+    
     console.log(chalk.cyan('\nExample post-config in config.yaml:'));
     console.log(chalk.gray(`
   my_template:
@@ -135,6 +145,72 @@ program
       console.log('Ignore patterns updated:', config.ignore);
     } else {
       console.log('Current ignore patterns:', config.ignore || []);
+    }
+  });
+
+program
+  .command('variables [pairs]')
+  .description('View or set global variables (comma-separated key=value)')
+  .option('--set', 'Set the variables to the provided pairs')
+  .option('--json <data>', 'Set variables via JSON string or file')
+  .option('--delete <key>', 'Delete a specific global variable')
+  .action((pairs, options) => {
+    const { loadConfig, saveConfig } = require('./config.js');
+    const config = loadConfig();
+    
+    if (options.delete) {
+      if (config.variables) {
+        const index = config.variables.findIndex((v: any) => v.name === options.delete);
+        if (index !== -1) {
+          config.variables.splice(index, 1);
+          saveConfig(config);
+          console.log(`Global variable "${options.delete}" removed.`);
+        } else {
+          console.log(`Global variable "${options.delete}" not found.`);
+        }
+      }
+      return;
+    }
+
+    if (options.set) {
+      if (options.json) {
+        try {
+          const fs = require('fs');
+          const data = options.json.startsWith('{') || options.json.startsWith('[') 
+            ? JSON.parse(options.json) 
+            : JSON.parse(fs.readFileSync(options.json, 'utf-8'));
+          config.variables = Array.isArray(data) ? data : [];
+          saveConfig(config);
+          console.log('Global variables updated via JSON.');
+        } catch (e: any) {
+          console.error('Failed to parse JSON for variables:', e.message);
+        }
+        return;
+      }
+
+      if (!config.variables) config.variables = [];
+      const parts = pairs ? pairs.split(',') : [];
+      for (const part of parts) {
+        const [k, ...v] = part.split('=');
+        if (k) {
+          const name = k.trim();
+          const val = v.join('=').trim();
+          const existing = config.variables.find((x: any) => x.name === name);
+          if (existing) {
+            existing.default = val;
+          } else {
+            config.variables.push({
+              name,
+              prompt: `Enter ${name}:`,
+              default: val
+            });
+          }
+        }
+      }
+      saveConfig(config);
+      console.log('Global variables updated.');
+    } else {
+      console.log('Current global variables:', config.variables || []);
     }
   });
 

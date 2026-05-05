@@ -131,6 +131,15 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     }
   }
 
+  // Include global variables as suggestions
+  if (config.variables && Array.isArray(config.variables)) {
+    for (const v of config.variables) {
+      if (!variables.some(existing => existing.name === v.name)) {
+        variables.push({ ...v });
+      }
+    }
+  }
+
   let hasMoreVariables = false;
   if (!options.yes && !options.json) {
     const message = variables.length > 0 

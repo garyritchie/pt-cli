@@ -18,6 +18,9 @@ pt learn /path/to/project
 # Enter variables as comma-separated names: client_name,project_name
 ```
 
+**Automatic Detection:**
+Instead of manual definition, `pt learn` and `pt update` automatically scan for placeholders like `{{ variable_name }}` in text files (root and 1st-level subdirectories). If found, they are automatically added to the `variables` list. This is the recommended way to manage variables for most templates.
+
 These variables are then used during `copy_files` operations to replace `{{variable_name}}` placeholders in copied files.
 
 ## Post-Config Tasks

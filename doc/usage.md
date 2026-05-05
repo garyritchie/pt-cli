@@ -20,6 +20,14 @@ pt learn /path/to/project --ignore=**/.godot/
 pt learn /path/to/project --name my_template --desc "My new template" --yes
 ```
 
+### Automatic Variable Detection
+
+During `pt learn` or `pt update`, the tool automatically scans text files at the root and in the first-level subdirectories for variable placeholders using the `{{ variable_name }}` syntax. 
+
+- **Detection Range:** Root files and 1st-level subfolder files (e.g., `README.md`, `.makerc`, `DOC/closedown.md`).
+- **Registration:** Any detected variables are automatically added to the template's configuration with default prompts (e.g., `Enter variable_name:`).
+- **Updating:** You can add new placeholders to a project folder and run `pt update <template_name>` to automatically register them in your existing template.
+
 ## Initialize a project
 
 ```bash

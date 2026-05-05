@@ -26,6 +26,7 @@ During `pt learn` or `pt update`, the tool automatically scans text files at the
 
 - **Detection Range:** Root files and 1st-level subfolder files (e.g., `README.md`, `.makerc`, `DOC/closedown.md`).
 - **Registration:** Any detected variables are automatically added to the template's configuration with default prompts (e.g., `Enter variable_name:`).
+- **Global Suggestions:** Your global variables (defined in `~/.pt/config.yaml`) are automatically injected as additional suggestions during the learn process.
 - **Updating:** You can add new placeholders to a project folder and run `pt update <template_name>` to automatically register them in your existing template.
 
 ## Initialize a project
@@ -60,7 +61,24 @@ pt rm <template_name>
 pt config
 ```
 
-Shows all templates, their `post_config` tasks (if any), source paths, global post-config tasks, ignore patterns, and an example post-config block.
+Shows all templates, their `post_config` tasks (if any), source paths, global post-config tasks, ignore patterns, global variables, and an example post-config block.
+
+## Manage Global Variables
+
+Global variables serve as boilerplate suggestions during the `pt learn` process.
+
+```bash
+# List global variables
+pt variables
+
+# Set/Update global variables (comma-separated pairs)
+pt variables --set AUTHOR="Gary Ritchie",LICENSE="MIT"
+
+# Delete a global variable
+pt variables --delete LICENSE
+```
+
+For more details on how these are used, see the [Configuration Guide](configuration.md).
 
 ## Template Sharing
 

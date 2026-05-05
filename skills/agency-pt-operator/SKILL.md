@@ -1,6 +1,6 @@
 ---
 name: agency-pt-operator
-description: Specialist in using pt-cli to scaffold project templates, capture boilerplate, and maintain standardized directory structures. Includes knowledge of the global_post_config feature and automatic variable detection.
+description: Specialist in using pt-cli to scaffold project templates, capture boilerplate, and maintain standardized directory structures. Includes knowledge of global_post_config, global variables, and automatic variable detection.
 ---
 
 # `pt-cli` Operator Skill
@@ -43,6 +43,15 @@ Global post-config tasks are stored in `~/.pt/config.yaml` under `global_post_co
 Tasks with `checked: false` stay unchecked by default in interactive mode. In `--yes` mode, **all** global tasks are applied. In `--skip-post-config` mode, **none** are applied.
 
 Use `pt config` to view currently configured global tasks. To add global tasks, edit `~/.pt/config.yaml` directly or use `pt add` for template management (global config is YAML-only at this time).
+
+## Global Variables
+
+Global variables are defined in `~/.pt/config.yaml` under `variables`. They act as **suggestions** during the `pt learn` or `pt update` process.
+
+- **Purpose:** They ensure that common metadata fields (like `author`, `license`, `project_version`) are consistently offered for inclusion in every new template you create.
+- **Inheritance:** When you `learn` a new project structure, these global variables are automatically merged with any detected variables (`{{ var }}`) and offered as part of the new template's variable list.
+- **Localization:** Once a template is saved, its variables are "stamped" in. Subsequent changes to global variables in the config will **not** retroactively affect old templates, ensuring stability and portability.
+- **Management:** Use `pt variables --set key=value` to update your global defaults. For bulk updates, use `pt variables --set --json '...'`.
 
 ## Workflow Optimization
 

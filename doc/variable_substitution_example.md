@@ -26,6 +26,9 @@ templates:
         substitute_variables: true
 ```
 
+> [!TIP]
+> **New in v0.16.0:** You no longer need to manually define the `variables` section. During `pt learn` or `pt update`, the tool will automatically detect `{{ variable_name }}` placeholders in your files and add them to the configuration for you.
+
 ## 2. Create Template Files
 
 Create the source files in your template directory using `{{variable_name}}` placeholders.

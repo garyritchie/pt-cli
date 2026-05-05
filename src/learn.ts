@@ -1,15 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile } from './config.js';
+import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile, TemplateVariable } from './config.js';
 import chalk from 'chalk';
-
-export interface TemplateVariable {
-  name: string;
-  prompt: string;
-  default?: string;
-  required?: boolean;
-}
 
 export async function learn(sourcePath: string, updateTemplate: string | null = null, options: any = {}): Promise<void> {
   const resolvedPath = path.resolve(sourcePath);
@@ -114,30 +107,63 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const cliIgnore = options.ignore ? options.ignore.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
   const ignorePatterns = [...(config.ignore || []), ...cliIgnore];
 
-  let hasVariables = false;
-  if (!options.yes && !options.json) {
-    const response = await inquirer.prompt({
-      type: 'confirm',
-      name: 'hasVariables',
-      message: 'Define template variables (e.g., client_name, project_type)?',
-      default: false
-    });
-    hasVariables = response.hasVariables;
+  // Detect variables from files
+  const detectedVars = findVariablesInFiles(resolvedPath, resolvedPath, ignorePatterns);
+  if (detectedVars.length > 0 && !options.json) {
+    console.log(chalk.cyan(`Auto-detected ${detectedVars.length} variable(s): ${detectedVars.join(', ')}`));
   }
 
   let variables: TemplateVariable[] = [];
-  if (hasVariables) {
+  
+  // Merge with existing variables if update
+  if (isUpdate && config.templates[updateTemplate].variables) {
+    variables = [...config.templates[updateTemplate].variables];
+  }
+
+  // Add detected variables if not already present
+  for (const varName of detectedVars) {
+    if (!variables.some(v => v.name === varName)) {
+      variables.push({
+        name: varName,
+        prompt: `Enter ${varName}:`,
+        required: true
+      });
+    }
+  }
+
+  let hasMoreVariables = false;
+  if (!options.yes && !options.json) {
+    const message = variables.length > 0 
+      ? `Detected/Existing variables: ${variables.map(v => v.name).join(', ')}. Define more?`
+      : 'Define template variables (e.g., client_name, project_type)?';
+      
+    const response = await inquirer.prompt({
+      type: 'confirm',
+      name: 'hasMoreVariables',
+      message: message,
+      default: false
+    });
+    hasMoreVariables = response.hasMoreVariables;
+  }
+
+  if (hasMoreVariables) {
     const { variableDefs } = await inquirer.prompt({
       type: 'input',
       name: 'variableDefs',
-      message: 'Define variables as comma-separated names:',
-      default: 'client_name,project_name'
+      message: 'Define additional variables as comma-separated names:',
     });
-    variables = variableDefs.split(',').map((v: string) => ({
-      name: v.trim(),
-      prompt: `Enter ${v.trim()}:`,
-      required: true
-    }));
+    if (variableDefs) {
+      const additionalVars = variableDefs.split(',').map((v: string) => v.trim()).filter(Boolean);
+      for (const v of additionalVars) {
+        if (!variables.some(existing => existing.name === v)) {
+          variables.push({
+            name: v,
+            prompt: `Enter ${v}:`,
+            required: true
+          });
+        }
+      }
+    }
   }
 
   // 1. Structure (skeleton)
@@ -325,4 +351,53 @@ function extractStructure(dirPath: string, rootPath: string, ignorePatterns?: st
     }
   } catch (e) {}
   return nodes;
+}
+
+/**
+ * Scan text files in top-level and 1st-level subdirectories for {{ variable_name }} placeholders.
+ */
+function findVariablesInFiles(dirPath: string, rootPath: string, ignorePatterns?: string[]): string[] {
+  const variables = new Set<string>();
+  const regex = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+  
+  const textExtensions = ['.md', '.txt', '.makerc', '.json', '.yaml', '.yml', '.ini', '.conf', '.config', '.sh', '.py', '.js', '.ts', '.html', '.css', '.makefile'];
+  
+  const scan = (currentPath: string, depth: number) => {
+    if (depth > 1) return; // Top level (0) and 1st level subfolders (1)
+    
+    try {
+      const entries = fs.readdirSync(currentPath, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(currentPath, entry.name);
+        const relativePath = path.relative(rootPath, fullPath);
+        
+        if (entry.isDirectory()) {
+          if (shouldIgnore(entry.name, relativePath, ignorePatterns)) continue;
+          if (shouldExclude(currentPath, fullPath)) continue;
+          scan(fullPath, depth + 1);
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase();
+          const isMakefile = entry.name.toLowerCase() === 'makefile';
+          
+          if (textExtensions.includes(ext) || isMakefile || ext === '') {
+            try {
+              const content = fs.readFileSync(fullPath, 'utf-8');
+              let match;
+              regex.lastIndex = 0;
+              while ((match = regex.exec(content)) !== null) {
+                variables.add(match[1]);
+              }
+            } catch (e) {
+              // Skip files that can't be read or aren't text
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore directory read errors
+    }
+  };
+  
+  scan(dirPath, 0);
+  return Array.from(variables);
 }

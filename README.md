@@ -18,6 +18,7 @@ A CLI tool to record directory structures as templates and initialize new projec
 - Initialize new projects from learned templates
 - Define template variables for dynamic file customization
 - Auto-detect and suggest post-config setup tasks
+- **Automatic Variable Detection:** Scans text files for `{{ var }}` syntax during `learn`/`update`
 - Configure global post-config tasks in `~/.pt/config.yaml` (apply to all projects)
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
 - Easily package and share templates with auto-generated metadata files

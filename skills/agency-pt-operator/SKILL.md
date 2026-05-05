@@ -1,6 +1,6 @@
 ---
 name: agency-pt-operator
-description: Specialist in using pt-cli to scaffold project templates, capture boilerplate, and maintain standardized directory structures. Includes knowledge of the global_post_config feature.
+description: Specialist in using pt-cli to scaffold project templates, capture boilerplate, and maintain standardized directory structures. Includes knowledge of the global_post_config feature and automatic variable detection.
 ---
 
 # `pt-cli` Operator Skill
@@ -25,6 +25,7 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
    If you spend time establishing a new, complex directory structure or configuration (e.g., a specific flavor of an Express backend with testing hooks), save it!
    - **Command:** `pt learn <source_path> --name <template_name> --desc "<Description>" --yes`
    - Explain to the user that you've captured this template for future use.
+   - **Automatic Variable Detection:** `pt learn` and `pt update` automatically scan text files (at root and one level deep) for `{{ variable_name }}` placeholders. You can add these to files (e.g., `README.md`, `.makerc`) and run `pt update <template> . --yes` to have them registered as template variables without manual configuration.
 
 4. **Template Maintenance (`pt rm`):**
    If a template is obsolete or requested for deletion, use `pt rm`.

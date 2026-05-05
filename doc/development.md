@@ -37,7 +37,7 @@ npm run lint
 pt-cli/
 ├── bin/          # CLI entry point (Node shebang wrapper)
 ├── src/          # TypeScript source
-│   ├── config.ts       # Config management, exclusion logic, type definitions
+│   ├── config.ts       # Config management, exclusion logic, type definitions, global_post_config helper
 │   ├── learn.ts        # Template learning logic + templateRoot storage + executable auto-detection
 │   ├── init.ts         # Project initialization + copy_files/post_copy/post_config wiring
 │   ├── postconfig.ts   # Post-config runner + baked-in defaults

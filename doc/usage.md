@@ -52,7 +52,7 @@ pt rm <template_name>
 pt config
 ```
 
-Shows all templates, their `post_config` tasks (if any), source paths, and an example post-config block.
+Shows all templates, their `post_config` tasks (if any), source paths, global post-config tasks, ignore patterns, and an example post-config block.
 
 ## Template Sharing
 

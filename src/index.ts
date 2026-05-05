@@ -96,6 +96,19 @@ program
       }
     }
     
+    // Show global post-config tasks
+    if (config.global_post_config && config.global_post_config.length > 0) {
+    console.log(chalk.cyan('\nGlobal Post-Config Tasks:'));
+      for (const task of config.global_post_config) {
+        const cmd = task.command || task.script || '(unknown)';
+        const desc = task.description ? ` — ${task.description}` : '';
+        const checked = task.checked !== false ? '[default: on]' : '[default: off]';
+        const typeFilter = task.type ? ` [type: ${task.type}]` : '';
+        console.log(chalk.gray(`  - ${cmd}${desc}`));
+        console.log(chalk.gray(`    ${checked}${typeFilter}`));
+      }
+    }
+    
     console.log(chalk.cyan('\nExample post-config in config.yaml:'));
     console.log(chalk.gray(`
   my_template:

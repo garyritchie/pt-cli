@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode, PostCopyFile } from './config.js';
+import { loadConfig, FolderNode, PostCopyFile, getGlobalPostConfig } from './config.js';
 import chalk from 'chalk';
 import { processCopyFiles } from './substitute.js';
 import { runPostConfig } from './postconfig.js';
@@ -171,29 +171,101 @@ export async function init(targetName: string | undefined, destPath: string | un
     console.log(chalk.gray(`  [DRY RUN] Would create .info.md`));
   }
 
-  // Write post_config scripts
-  if (template.post_config && template.post_config.length > 0) {
-    if (!options.dryRun) {
+  // Merge global + template post_config tasks
+  const globalPostConfig = getGlobalPostConfig(config);
+  const globalApplicableTasks = globalPostConfig.filter(t => !t.type || t.type === typeName!);
+  const templateApplicableTasks = template.post_config?.filter(t => !t.type || t.type === typeName!) || [];
+  const allTasks = [...globalApplicableTasks, ...templateApplicableTasks];
+
+  if (allTasks.length > 0) {
+    // Determine which tasks to include
+    let selectedTaskNames: string[] = [];
+    
+    if (options.skipPostConfig) {
+      // Skip entirely
+      selectedTaskNames = [];
+    } else if (options.dryRun) {
+      // In dry-run, select all (for display)
+      selectedTaskNames = allTasks.map(t => t.command || t.script || '');
+      console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
+      for (const t of allTasks) {
+        const desc = t.description ? ` (${t.description})` : '';
+        const source = globalApplicableTasks.includes(t) ? '[global]' : '[template]';
+        console.log(chalk.gray(`  ${source} - ${t.command || t.script}${desc}`));
+      }
+    } else if (options.yes) {
+      // All tasks selected
+      selectedTaskNames = allTasks.map(t => t.command || t.script || '');
+    } else if (allTasks.length === 0) {
+      selectedTaskNames = [];
+    } else {
+      // Checkbox prompt: show global + template tasks grouped
+      const choices: Array<{name: string; value: string; checked?: boolean}> = [];
+      
+      // Group separator for global
+      choices.push({ name: '── Global post-config ──', value: '__group__global__', checked: true });
+      for (const t of globalApplicableTasks) {
+        const cmd = t.command || t.script || '(no command)';
+        const desc = t.description ? ` (${t.description})` : '';
+        choices.push({
+          name: `${cmd}${desc}`,
+          value: cmd,
+          checked: t.checked !== false
+        });
+      }
+      
+      // Group separator for template
+      choices.push({ name: '── Template post-config ──', value: '__group__template__', checked: true });
+      for (const t of templateApplicableTasks) {
+        const cmd = t.command || t.script || '(no command)';
+        const desc = t.description ? ` (${t.description})` : '';
+        choices.push({
+          name: `${cmd}${desc}`,
+          value: cmd,
+          checked: true
+        });
+      }
+      
+      const response = await inquirer.prompt({
+        type: 'checkbox',
+        name: 'selected',
+        message: 'Select post-config tasks to run:',
+        loop: false,
+        theme: {
+          icon: {
+            cursor: chalk.green('[x] ')
+          }
+        },
+        choices
+      });
+      selectedTaskNames = response.selected || [];
+    }
+    
+   // Write post_config scripts for selected tasks
+    if (selectedTaskNames.length > 0 && !options.dryRun) {
       let bashContent = '#!/bin/bash\n# Auto-generated post_config script\n\n';
       let batContent = '@echo off\n:: Auto-generated post_config script\n\n';
-      for (const task of template.post_config) {
-        const cmd = task.command || (task.script ? `./${task.script}` : '');
-        if (cmd) {
-          bashContent += `echo "Running: ${task.description || cmd}"\n${cmd}\n`;
-          batContent += `echo Running: ${task.description || cmd}\n${cmd}\n`;
+      for (const t of allTasks) {
+        // Determine the actual command/script to use
+        let cmd = '';
+        if (t.command) {
+          cmd = t.command;
+        } else if (t.script) {
+          cmd = `./${t.script}`;
+        }
+        // Match against selected names (use command if available, else script)
+        const taskKey = t.command || (t.script ? `./${t.script}` : '');
+        if (selectedTaskNames.includes(taskKey)) {
+          if (cmd) {
+            bashContent += `echo "Running: ${t.description || taskKey}"\n${cmd}\n`;
+            batContent += `echo Running: ${t.description || taskKey}\n${cmd}\n`;
+          }
         }
       }
       fs.writeFileSync(path.join(resolvedDest, 'post_config.sh'), bashContent);
       try { fs.chmodSync(path.join(resolvedDest, 'post_config.sh'), 0o755); } catch(e) {}
       fs.writeFileSync(path.join(resolvedDest, 'post_config.bat'), batContent);
-    } else {
-      console.log(chalk.gray(`  [DRY RUN] Would create post_config.sh and post_config.bat`));
     }
-  }
-
-  // 4. Run post-config tasks
-  if (template.post_config) {
-    await runPostConfig(resolvedDest, template.post_config, typeName!, options);
   }
 
   if (options.dryRun) {

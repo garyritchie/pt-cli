@@ -4,6 +4,8 @@ Config is stored at `~/.pt/config.yaml` and contains:
 
 - `version`: Config version
 - `templates`: Dictionary of learned templates with folder structure, `templateRoot`, `copy_files`, `post_copy`, and `post_config`
+- `global_post_config`: Array of post-config tasks applied to **every** project (regardless of template)
+- `ignore`: Global folder ignore patterns for `pt learn`
 
 ## Template Variables
 
@@ -103,6 +105,49 @@ Each task supports:
 - Git already initialized: caught silently
 - Permission errors: caught and logged
 - If all tasks fail: warn but don't block project creation
+
+## Global Post-Config
+
+Global post-config tasks are defined at the top level of `~/.pt/config.yaml` under `global_post_config`. They are **always** applied to every project initialized with `pt init`, regardless of which template is used. This eliminates the need to repeat boilerplate setup (e.g. `git init`) in every template.
+
+### Configuration
+
+```yaml
+global_post_config:
+  - command: "git init"
+    description: "Initialize git repository"
+  - command: "git add -A && git commit -m 'Initial commit'"
+    description: "Initial git commit"
+    checked: false  # default on, but user must manually check
+  - command: "git lfs install"
+    description: "Install git-lfs hooks"
+    type: "godot"  # only applies to godot projects
+```
+
+### Fields
+
+Each global task supports the same fields as template post-config:
+
+| Field         | Description                                                                      |
+| ------------- | -------------------------------------------------------------------------------- |
+| `command`     | Shell command to run                                                             |
+| `description` | Shown to user during interactive selection                                       |
+| `checked`     | Default checkbox state (`true` by default); set `false` to require manual opt-in |
+| `type`        | Filter by project type (e.g. `"javascript"`); if set, task only applies when template type matches |
+
+### Behavior
+
+- **`--yes` mode**: all global tasks are applied automatically, alongside template tasks.
+- **`--skip-post-config`**: no global or template tasks are applied.
+- **`--dry-run`**: global tasks are listed with a `[global]` prefix.
+- **Interactive mode**: global and template tasks are shown in separate checkbox groups ("Global post-config" and "Template post-config"). Global tasks default to checked; `checked: false` overrides this.
+- **No deduplication**: if a global task and a template task have the same command, both appear — the user selects or deselects independently.
+
+### Viewing
+
+Run `pt config` to see global post-config tasks listed under "Global Post-Config Tasks:" with their default checked state and optional type filter.
+
+Global tasks cannot be added via `pt add` or `pt learn` — they must be edited directly in `~/.pt/config.yaml`.
 
 ## Copy Files
 
@@ -249,4 +294,5 @@ During `pt init`:
 2. **Copy `copy_files`** — with optional variable substitution and chmod
 3. **Copy `post_copy`** — executable scripts (auto-detected or manual)
 4. **Generate sharing metadata** — root `.info.md` and `post_config.sh`/`post_config.bat` are created so the result can be easily shared as a template
-5. **Execute post-config tasks** — shell commands
+5. **Merge post-config tasks** — combine global post-config (from `~/.pt/config.yaml`) with template post-config tasks; filter by project type
+6. **Execute post-config tasks** — shell commands (interactive prompt, `--yes` for all, or `--skip-post-config` to omit)

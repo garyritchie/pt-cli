@@ -20,6 +20,7 @@ export interface PostConfigTask {
   always_prompt?: boolean; // if true, ask per-task even if user says "yes"
   script?: string;        // path to script relative to template root
   cross_platform?: boolean; // if true, use platform-safe runner
+  checked?: boolean;      // default checkbox state (only for global tasks)
 }
 
 export interface CopyFileEntry {
@@ -56,6 +57,7 @@ export interface PtConfig {
   version: string;
   templates: Record<string, TemplateConfig>;
   ignore?: string[];  // top-level folder ignore patterns for pt learn
+  global_post_config?: PostConfigTask[];  // global post-config tasks applied to all projects
 }
 
 export function ensureConfigDir() {
@@ -69,7 +71,8 @@ export function loadConfig(): PtConfig {
   if (!fs.existsSync(CONFIG_PATH)) {
     const defaultConfig: PtConfig = {
       version: '3.0',
-      templates: {}
+      templates: {},
+      global_post_config: []
     };
     saveConfig(defaultConfig);
     return defaultConfig;
@@ -80,6 +83,11 @@ export function loadConfig(): PtConfig {
   // Initialize ignore for legacy configs that don't have it
   if (config.ignore === undefined) {
     config.ignore = [];
+  }
+
+  // Initialize global_post_config for configs that don't have it
+  if (config.global_post_config === undefined) {
+    config.global_post_config = [];
   }
 
   // Migration from 2.0 to 3.0
@@ -110,6 +118,19 @@ export function saveConfig(config: PtConfig) {
 
 export function getTemplateNames(config: PtConfig): string[] {
   return Object.keys(config.templates || {});
+}
+
+/**
+ * Get global post-config tasks with defaults applied for unchecked entries.
+ * Global tasks that have checked=true (or undefined, which defaults to true)
+ * will be auto-checked. Tasks with checked=false stay unchecked by default.
+ */
+export function getGlobalPostConfig(config: PtConfig): PostConfigTask[] {
+  const global = config.global_post_config || [];
+  return global.map(t => ({
+    ...t,
+    checked: t.checked !== false // default to true if not explicitly false
+  }));
 }
 
 // Default exclusions for template scanning

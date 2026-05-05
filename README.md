@@ -8,6 +8,7 @@ A CLI tool to record directory structures as templates and initialize new projec
 
 - **Instantly replicating proven architectures:** Stop recreating folder structures manually. `pt learn` saves the shape of any project.
 - **Automating the setup grind:** With post-config tasks, `pt init` can automatically run `npm install`, `git init`, or setup python virtual environments for you.
+- **Global post-config:** Configure shared tasks (e.g. `git init`, `git lfs install`) once in `~/.pt/config.yaml` and have them apply to every project type automatically.
 - **Agentic automation:** Fully supports headless operation via non-interactive flags and includes a skill for integration with AI agents.
 - **File copying & templating:** Beyond directories, it allows injecting variables into key files (`package.json`, `README.md`, etc.) and automatically ports over executable scripts.
 
@@ -17,6 +18,7 @@ A CLI tool to record directory structures as templates and initialize new projec
 - Initialize new projects from learned templates
 - Define template variables for dynamic file customization
 - Auto-detect and suggest post-config setup tasks
+- Configure global post-config tasks in `~/.pt/config.yaml` (apply to all projects)
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
 - Easily package and share templates with auto-generated metadata files
 - Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation

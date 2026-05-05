@@ -49,7 +49,7 @@ program
   .description('Show current config location and list templates')
   .option('--json', 'Output config as JSON')
   .action((options) => {
-    const { loadConfig, getTemplateNames } = require('./config.js');
+    const { loadConfig, getTemplateNames, CONFIG_PATH } = require('./config.js');
     const config = loadConfig();
     
     if (options.json) {
@@ -59,7 +59,7 @@ program
     
     const names = getTemplateNames(config);
     
-    console.log(chalk.cyan('Config Location:'), require('os').homedir() + '/.pt/config.yaml');
+    console.log(chalk.cyan('Config Location:'), CONFIG_PATH);
     console.log(chalk.cyan('\nLearned Templates:'));
     if (names.length === 0) {
       console.log(chalk.gray('  (none)'));
@@ -160,11 +160,19 @@ program
       }
       
       if (!config.templates) config.templates = {};
+      
+      // Basic validation: ensure we aren't accidentally adding a full config object
+      if (data && data.templates && typeof data.templates === 'object') {
+        console.error(chalk.red('Error: The provided JSON appears to be a full configuration file, not a single template.'));
+        console.error(chalk.gray('If you want to import a specific template from it, extract that template object first.'));
+        process.exit(1);
+      }
+
       config.templates[name] = data;
       saveConfig(config);
-      console.log(`Template "${name}" saved successfully.`);
+      console.log(chalk.green(`✓ Template "${name}" saved successfully.`));
     } catch (e: any) {
-      console.error('Failed to parse template JSON:', e.message);
+      console.error(chalk.red(`Failed to parse template JSON: ${e.message}`));
       process.exit(1);
     }
   });

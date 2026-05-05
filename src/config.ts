@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const HOME_DIR = path.join(os.homedir(), '.pt');
-const CONFIG_PATH = path.join(HOME_DIR, 'config.yaml');
+export const HOME_DIR = path.join(os.homedir(), '.pt');
+export const CONFIG_PATH = path.join(HOME_DIR, 'config.yaml');
 
 export interface FolderNode {
   name: string;
@@ -74,46 +74,82 @@ export function loadConfig(): PtConfig {
       templates: {},
       global_post_config: []
     };
-    saveConfig(defaultConfig);
+    // Don't automatically save a default config on load.
+    // This prevents accidental creation of mostly-empty configs 
+    // if the home directory is temporarily mapped incorrectly.
     return defaultConfig;
   }
 
-  const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
-  const config: PtConfig = YAML.parse(content);
-  // Initialize ignore for legacy configs that don't have it
-  if (config.ignore === undefined) {
-    config.ignore = [];
-  }
-
-  // Initialize global_post_config for configs that don't have it
-  if (config.global_post_config === undefined) {
-    config.global_post_config = [];
-  }
-
-  // Migration from 2.0 to 3.0
-  if (config.version === '2.0') {
-    for (const key in config.templates) {
-      const t = config.templates[key] as any;
-      if (t.name && !t.description) {
-        t.description = t.name;
-        delete t.name;
-      }
-      if (t.type) {
-        delete t.type;
-      }
+  try {
+    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    if (!content.trim()) {
+      throw new Error("Config file is empty");
     }
-    config.version = '3.0';
-    saveConfig(config);
-    console.log(`\nConfig migrated to version 3.0 (renamed 'name' to 'description', removed 'type')`);
-  }
+    const config: PtConfig = YAML.parse(content);
+    
+    // Initialize ignore for legacy configs that don't have it
+    if (config.ignore === undefined) {
+      config.ignore = [];
+    }
 
-  return config;
+    // Initialize global_post_config for configs that don't have it
+    if (config.global_post_config === undefined) {
+      config.global_post_config = [];
+    }
+
+    // Migration from 2.0 to 3.0
+    if (config.version === '2.0') {
+      for (const key in config.templates) {
+        const t = config.templates[key] as any;
+        if (t.name && !t.description) {
+          t.description = t.name;
+          delete t.name;
+        }
+        if (t.type) {
+          delete t.type;
+        }
+      }
+      config.version = '3.0';
+      saveConfig(config);
+      console.log(`\nConfig migrated to version 3.0 (renamed 'name' to 'description', removed 'type')`);
+    }
+
+    return config;
+  } catch (err: any) {
+    console.error(chalk.red(`\nError loading config: ${err.message}`));
+    // If we have a backup, maybe suggest using it
+    const backupPath = CONFIG_PATH + '.bak';
+    if (fs.existsSync(backupPath)) {
+      console.error(chalk.yellow(`A backup exists at ${backupPath}. You may want to restore it.`));
+    }
+    process.exit(1);
+  }
 }
 
 export function saveConfig(config: PtConfig) {
   ensureConfigDir();
   const content = YAML.stringify(config);
-  fs.writeFileSync(CONFIG_PATH, content);
+  const tempPath = CONFIG_PATH + '.tmp';
+  const backupPath = CONFIG_PATH + '.bak';
+
+  try {
+    // 1. Create a backup of the current valid config if it exists
+    if (fs.existsSync(CONFIG_PATH)) {
+      fs.copyFileSync(CONFIG_PATH, backupPath);
+    }
+
+    // 2. Write to a temporary file first (atomic save)
+    fs.writeFileSync(tempPath, content);
+
+    // 3. Rename temp file to actual config path
+    fs.renameSync(tempPath, CONFIG_PATH);
+  } catch (err: any) {
+    console.error(chalk.red(`\nFailed to save config: ${err.message}`));
+    if (fs.existsSync(tempPath)) {
+      try { fs.unlinkSync(tempPath); } catch (e) {}
+    }
+    throw err;
+  }
 }
 
 export function getTemplateNames(config: PtConfig): string[] {

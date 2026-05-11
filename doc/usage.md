@@ -80,7 +80,9 @@ pt variables --delete LICENSE
 
 For more details on how these are used, see the [Configuration Guide](configuration.md).
 
-## Template Sharing
+## Template Sharing & JSON
+
+### File-based Sharing (Recommended)
 
 You can share your templates with others simply by sharing a directory (or a ZIP of it). When someone else runs `pt learn` on it, `pt` will automatically detect the following files at the root:
 
@@ -88,3 +90,35 @@ You can share your templates with others simply by sharing a directory (or a ZIP
 - `post_config.sh` or `post_config.bat`: Parsed to automatically populate the `post_config` actions in the user's `config.yaml`.
 
 These files are also automatically generated at the root of a new project whenever you run `pt init`, making it trivial to initialize a project, zip it up, and share it with teammates as a fully-featured template!
+
+### JSON Export & Import
+
+For a more portable, text-based approach, you can export and import templates as JSON strings or files.
+
+#### Exporting a Template to JSON
+To export an existing template from your configuration as JSON:
+```bash
+pt config <template_name> --json > my_template.json
+```
+
+To generate a JSON representation of a project structure from a path (without saving it):
+```bash
+pt learn /path/to/project --json > my_template.json
+```
+
+#### Importing a Template from JSON
+To add a template from a JSON file:
+```bash
+pt add <template_name> --file my_template.json
+```
+
+Or from a JSON string:
+```bash
+pt add <template_name> '{"description":"My Template","files":{...}}'
+```
+
+#### Exporting Full Config
+To see your entire configuration (including all templates) in JSON format:
+```bash
+pt config --json
+```

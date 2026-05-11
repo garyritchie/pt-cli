@@ -2,6 +2,7 @@
 
 ## Issue
 
+- [ ] Did `pt learn` on GLR/TAXES and even thought they were unchecked these folders were still included in the 'folders' key of the config.yaml: .stfolder, .stversions (recursively), 
 
 ## Feature Request
 

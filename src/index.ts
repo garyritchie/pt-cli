@@ -45,15 +45,28 @@ program
   });
 
 program
-  .command('config')
-  .description('Show current config location and list templates')
-  .option('--json', 'Output config as JSON')
-  .action((options) => {
+  .command('config [templateName]')
+  .description('Show current config location and list templates, or export a specific template')
+  .option('--json', 'Output config or specific template as JSON')
+  .action((templateName, options) => {
     const { loadConfig, getTemplateNames, CONFIG_PATH } = require('./config.js');
     const config = loadConfig();
     
     if (options.json) {
-      console.log(JSON.stringify(config, null, 2));
+      if (templateName) {
+        if (config.templates && config.templates[templateName]) {
+          const output = {
+            name: templateName,
+            ...config.templates[templateName]
+          };
+          console.log(JSON.stringify(output, null, 2));
+        } else {
+          console.error(chalk.red(`Error: Template "${templateName}" not found.`));
+          process.exit(1);
+        }
+      } else {
+        console.log(JSON.stringify(config, null, 2));
+      }
       return;
     }
     

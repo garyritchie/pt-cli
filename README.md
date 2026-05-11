@@ -21,7 +21,7 @@ A CLI tool to record directory structures as templates and initialize new projec
 - **Automatic Variable Detection:** Scans text files for `{{ var }}` syntax during `learn`/`update`
 - Configure global post-config tasks in `~/.pt/config.yaml` (apply to all projects)
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
-- Easily package and share templates with auto-generated metadata files
+- Easily package and share templates with auto-generated metadata files or JSON export/import
 - Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation
 
 ## Quick Start
@@ -49,6 +49,12 @@ pt init <template_name> /path/to/new/project
 
 # List available templates and configurations
 pt config
+
+# Export an existing template as JSON
+pt config my_template --json > template.json
+
+# Import a template from JSON
+pt add my_new_template --file template.json
 ```
 
 ## Documentation

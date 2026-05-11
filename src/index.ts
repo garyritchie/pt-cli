@@ -18,7 +18,7 @@ program
   .option('-y, --yes', 'Automatically confirm prompts')
   .option('--name <name>', 'Template name (skip prompt)')
   .option('--desc <description>', 'Template description (skip prompt)')
-  .option('--json', 'Output template structure as JSON instead of saving')
+  .option('--json', 'Output template structure as JSON for sharing instead of saving')
   .action(async (pathArg, options) => {
     await learn(pathArg, null, options);
   });
@@ -216,7 +216,7 @@ program
 
 program
   .command('add <name> [json]')
-  .description('Add or update a template from JSON string or file')
+  .description('Import/add a template from a JSON string or file')
   .option('-f, --file <path>', 'Path to JSON file containing template data')
   .action((name, jsonStr, options) => {
     const { loadConfig, saveConfig } = require('./config.js');

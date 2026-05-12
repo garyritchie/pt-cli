@@ -12,7 +12,7 @@ export function substituteVariables(
   content: string,
   variables: Record<string, string>
 ): string {
-  return content.replace(/\{\{(\w+)\}\}/g, (_, varName) => {
+  return content.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, varName) => {
     return variables[varName] ?? `{{${varName}}}`;
   });
 }

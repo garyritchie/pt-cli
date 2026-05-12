@@ -2,6 +2,29 @@
 
 A CLI tool to record directory structures as templates and initialize new projects from them.
 
+```mermaid
+graph LR
+    subgraph Input_Layer ["Pattern Inputs"]
+        A[Existing Project Structures]
+        B[Template JSON/YAML]
+    end
+
+    C{pt-cli}
+    
+    subgraph Output_Layer ["Results"]
+        D[Replicated Structure A]
+        E[Replicated Structure B]
+    end
+
+    A -->|Learn| C
+    B <-->|Config| C
+    C --> |Init| D
+    C --> |Init| E
+    C --> |Update| A
+
+    style C fill:#f9f,stroke:#333,stroke-width:2px
+```
+
 ## The Pipeline Benefit
 
 `pt-cli` is built to reduce boilerplate setup and ensure consistency across your workspaces. In a production pipeline, standardization is key to lowering the friction of cognitive load. `pt` helps by:

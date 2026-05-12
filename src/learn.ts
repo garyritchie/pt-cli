@@ -242,7 +242,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const templateConfig: TemplateConfig = {
     description: description,
     templateRoot: resolvedPath,
-    folders: folders,
+    folders: folders.filter(f => selectedFolders.includes(f.name)),
     copy_files: copy_files,
     variables: variables.length > 0 ? variables : undefined
   };
@@ -346,17 +346,21 @@ function extractStructure(dirPath: string, rootPath: string, ignorePatterns?: st
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
       const relativePath = path.relative(rootPath, fullPath);
-      if (entry.isDirectory() && shouldIgnore(entry.name, relativePath, ignorePatterns)) continue;
+      
+      // Only include directories in the structure skeleton
+      const isDirectory = entry.isDirectory() || (entry.isSymbolicLink() && fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory());
+      if (!isDirectory) continue;
+
+      if (shouldIgnore(entry.name, relativePath, ignorePatterns)) continue;
       if (shouldExclude(dirPath, fullPath)) continue;
-      if (entry.isDirectory()) {
-        const children = extractStructure(fullPath, rootPath, ignorePatterns);
-        let info = "";
-        const gitkeepPath = path.join(fullPath, '.gitkeep.md');
-        const infoPath = path.join(fullPath, '.info.md');
-        if (fs.existsSync(gitkeepPath)) info = fs.readFileSync(gitkeepPath, 'utf-8').trim();
-        else if (fs.existsSync(infoPath)) info = fs.readFileSync(infoPath, 'utf-8').trim();
-        nodes.push({ name: entry.name, info: info, children: children });
-      }
+
+      const children = extractStructure(fullPath, rootPath, ignorePatterns);
+      let info = "";
+      const gitkeepPath = path.join(fullPath, '.gitkeep.md');
+      const infoPath = path.join(fullPath, '.info.md');
+      if (fs.existsSync(gitkeepPath)) info = fs.readFileSync(gitkeepPath, 'utf-8').trim();
+      else if (fs.existsSync(infoPath)) info = fs.readFileSync(infoPath, 'utf-8').trim();
+      nodes.push({ name: entry.name, info: info, children: children });
     }
   } catch (e) {}
   return nodes;

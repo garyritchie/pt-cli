@@ -88,6 +88,18 @@ For full details on usage, configurations, and exclusions, please refer to the d
 - [Configuration Guide](doc/configuration.md) - Template variables, post-config tasks, file copying, and more.
 - [Exclusions](doc/exclusions.md) - Learn about default ignored files and how to set custom patterns.
 
+## Development
+
+### Project Structure
+- `src/index.ts`: Entry point and command registration.
+- `src/commands/`: Individual command handler modules.
+- `src/config.ts`: Configuration loading, saving, and type definitions.
+
+### Technical Notes
+- **ESM Migration**: The project is now pure ESM. All internal imports must use the `.js` extension.
+- **Development Tooling**: Use `tsx` for running `.ts` files directly (`npm run dev`).
+- **Building**: Use `tsc` to compile to `dist/`.
+
 ## Agent Integration
 
 `pt-cli` is compatible with AI agents. By utilizing the non-interactive flags (`--yes`, `--vars`, `--name`, `--desc`), agents can autonomously scaffold and learn projects without hanging on interactive terminal prompts.

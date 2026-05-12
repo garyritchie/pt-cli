@@ -9,8 +9,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "ts-node src/index.ts",
-    "dev": "ts-node src/index.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx src/index.ts",
     "prepublishOnly": "npm run build",
     "build:linux": "bun build ./src/index.ts --compile --target=bun-linux-x64   --outfile ../BUILD/pt-cli/pt-linux",
     "build:macos": "bun build ./src/index.ts --compile --target=bun-darwin-x64  --outfile ../BUILD/pt-cli/pt-macos",
@@ -30,6 +30,7 @@
     "typescript": "^5.6.0",
     "@types/node": "^22.0.0",
     "@types/inquirer": "^9.0.7",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0"
   }
 }

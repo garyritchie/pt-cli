@@ -82,7 +82,7 @@ For more details on how these are used, see the [Configuration Guide](configurat
 
 ## Template Sharing & JSON
 
-### File-based Sharing (Recommended)
+### File-based Sharing
 
 You can share your templates with others simply by sharing a directory (or a ZIP of it). When someone else runs `pt learn` on it, `pt` will automatically detect the following files at the root:
 
@@ -99,11 +99,6 @@ For a more portable, text-based approach, you can export and import templates as
 To export an existing template from your configuration as JSON:
 ```bash
 pt config <template_name> --json > my_template.json
-```
-
-To generate a JSON representation of a project structure from a path (without saving it):
-```bash
-pt learn /path/to/project --json > my_template.json
 ```
 
 #### Importing a Template from JSON

@@ -175,8 +175,7 @@ variables:
 1. **`pt learn`**: When scanning a project to create a new template, `pt` will:
    - Detect variables from text files using `{{ name }}` syntax.
    - Inject the **Global Variables** as additional suggestions.
-   - (GUI) Provide a checkbox for each variable row, allowing you to selectively include them in the template.
-   - (CLI) Prompt for each variable definition unless `--yes` is used.
+   - Prompt for each variable definition unless `--yes` is used.
 
 2. **`pt init`**: Project initialization uses only the variables explicitly saved in the chosen template. This ensures that templates are self-contained and portable.
 
@@ -184,7 +183,7 @@ variables:
    - `pt variables`: List current global variables.
    - `pt variables --set KEY=VAL`: Set/update a global variable's default value.
    - `pt variables --delete KEY`: Remove a global variable.
-   - `pt variables --set --json '...'`: Bulk update via JSON (primarily for GUI use).
+   - `pt variables --set --json '...'`: Bulk update via JSON.
 
 ## Copy Files
 

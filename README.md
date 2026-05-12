@@ -22,7 +22,7 @@ graph LR
     C --> |Init| E
     C --> |Update| A
 
-    style C fill:#f9f,stroke:#333,stroke-width:2px
+    style C color:#000,fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
 ## The Pipeline Benefit

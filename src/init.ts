@@ -1,12 +1,18 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import fs from 'fs';
+import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode, PostCopyFile, getGlobalPostConfig } from './config.js';
+import { loadConfig, FolderNode, getGlobalPostConfig } from './config.js';
 import chalk from 'chalk';
 import { processCopyFiles } from './substitute.js';
-import { runPostConfig } from './postconfig.js';
 
-export async function init(targetName: string | undefined, destPath: string | undefined, options: any = {}) {
+export interface InitOptions {
+  skipPostConfig?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
+  vars?: string;
+}
+
+export async function init(targetName: string | undefined, destPath: string | undefined, options: InitOptions = {}) {
   const config = loadConfig();
 
   let typeName: string | undefined = targetName;

@@ -1,9 +1,15 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import fs from 'fs';
+import path from 'path';
 import { execSync } from 'child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { PostConfigTask } from './config.js';
+
+export interface PostConfigOptions {
+  skipPostConfig?: boolean;
+  dryRun?: boolean;
+  yes?: boolean;
+}
 
 /**
  * Runs post-configuration tasks for a project.
@@ -12,7 +18,7 @@ export async function runPostConfig(
   destPath: string,
   tasks: PostConfigTask[],
   projectType: string,
-  options: any = {}
+  options: PostConfigOptions = {}
 ): Promise<void> {
   if (options.skipPostConfig) return;
 

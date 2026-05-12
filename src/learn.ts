@@ -1,10 +1,18 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import fs from 'fs';
+import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile, TemplateVariable } from './config.js';
+import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile, TemplateVariable, CopyFileEntry, PostConfigTask } from './config.js';
 import chalk from 'chalk';
 
-export async function learn(sourcePath: string, updateTemplate: string | null = null, options: any = {}): Promise<void> {
+export interface LearnOptions {
+  ignore?: string;
+  yes?: boolean;
+  name?: string;
+  desc?: string;
+  json?: boolean;
+}
+
+export async function learn(sourcePath: string, updateTemplate: string | null = null, options: LearnOptions = {}): Promise<void> {
   const resolvedPath = path.resolve(sourcePath);
   
   if (!fs.existsSync(resolvedPath)) {
@@ -162,7 +170,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       message: 'Define additional variables as comma-separated names:',
     });
     if (variableDefs) {
-      const additionalVars = variableDefs.split(',').map((v: string) => v.trim()).filter(Boolean);
+      const additionalVars = (variableDefs as string).split(',').map((v: string) => v.trim()).filter(Boolean);
       for (const v of additionalVars) {
         if (!variables.some(existing => existing.name === v)) {
           variables.push({
@@ -251,7 +259,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     selectedFolders = copyFoldersResponse.selectedFolders;
   }
 
-  const copy_files: any[] = [];
+  const copy_files: CopyFileEntry[] = [];
   for (const f of selectedFiles) {
     copy_files.push({ src: f, dest: f, substitute_variables: true });
   }
@@ -268,7 +276,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   };
 
   // Check for post_config scripts
-  const postConfigTasks: any[] = [];
+  const postConfigTasks: PostConfigTask[] = [];
   const shPath = path.join(resolvedPath, 'post_config.sh');
   const batPath = path.join(resolvedPath, 'post_config.bat');
   if (fs.existsSync(shPath)) {

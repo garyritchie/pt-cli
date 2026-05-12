@@ -1,9 +1,9 @@
 import chalk from 'chalk';
 import { execSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import { TemplateConfig, PostConfigTask, CopyFileEntry } from './config';
-import { loadConfig, sanitizePath } from './config';
+import fs from 'fs';
+import path from 'path';
+import { TemplateConfig } from './config.js';
+import { sanitizePath } from './config.js';
 
 /**
  * Replaces all {{var}} patterns in the content with values from the variables object.

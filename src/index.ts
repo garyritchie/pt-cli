@@ -3,13 +3,20 @@ import { Command } from 'commander';
 import { learn } from './learn.js';
 import { init } from './init.js';
 import chalk from 'chalk';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { loadConfig, saveConfig, getTemplateNames, CONFIG_PATH, PtConfig, TemplateVariable } from './config.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
 const program = new Command();
 
 program
   .name('pt')
   .description('Project Template CLI - Learn and initialize project structures')
-  .version(require('../package.json').version, '-v', 'output the version number');
+  .version(pkg.version, '-v', 'output the version number');
 
 program
   .command('learn <path>')
@@ -19,7 +26,7 @@ program
   .option('--name <name>', 'Template name (skip prompt)')
   .option('--desc <description>', 'Template description (skip prompt)')
   .option('--json', 'Output template structure as JSON for sharing instead of saving')
-  .action(async (pathArg, options) => {
+  .action(async (pathArg: string, options: { ignore?: string; yes?: boolean; name?: string; desc?: string; json?: boolean }) => {
     await learn(pathArg, null, options);
   });
 
@@ -29,7 +36,7 @@ program
   .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
   .option('-y, --yes', 'Automatically confirm prompts')
   .option('--desc <description>', 'Template description (skip prompt)')
-  .action(async (templateName, sourcePath, options) => {
+  .action(async (templateName: string, sourcePath: string | undefined, options: { ignore?: string; yes?: boolean; desc?: string }) => {
     await learn(sourcePath || '.', templateName, options);
   });
 
@@ -40,7 +47,7 @@ program
   .option('--dry-run', 'Show what would be created without making changes')
   .option('-y, --yes', 'Automatically answer yes to prompts')
   .option('--vars <variables>', 'Comma-separated key=value variables (e.g. key1=val1,key2=val2)')
-  .action(async (typeName, destPath, options) => {
+  .action(async (typeName: string | undefined, destPath: string | undefined, options: { skipPostConfig?: boolean; dryRun?: boolean; yes?: boolean; vars?: string }) => {
     await init(typeName, destPath, options);
   });
 
@@ -48,8 +55,7 @@ program
   .command('config [templateName]')
   .description('Show current config location and list templates, or export a specific template')
   .option('--json', 'Output config or specific template as JSON')
-  .action((templateName, options) => {
-    const { loadConfig, getTemplateNames, CONFIG_PATH } = require('./config.js');
+  .action((templateName: string | undefined, options: { json?: boolean }) => {
     const config = loadConfig();
     
     if (options.json) {
@@ -148,8 +154,7 @@ program
   .command('ignore [patterns]')
   .description('View or set global ignore patterns (comma-separated)')
   .option('--set', 'Set the ignore patterns to the provided value')
-  .action((patterns, options) => {
-    const { loadConfig, saveConfig } = require('./config.js');
+  .action((patterns: string | undefined, options: { set?: boolean }) => {
     const config = loadConfig();
     
     if (options.set) {
@@ -167,13 +172,12 @@ program
   .option('--set', 'Set the variables to the provided pairs')
   .option('--json <data>', 'Set variables via JSON string or file')
   .option('--delete <key>', 'Delete a specific global variable')
-  .action((pairs, options) => {
-    const { loadConfig, saveConfig } = require('./config.js');
+  .action((pairs: string | undefined, options: { set?: boolean; json?: string; delete?: string }) => {
     const config = loadConfig();
     
     if (options.delete) {
       if (config.variables) {
-        const index = config.variables.findIndex((v: any) => v.name === options.delete);
+        const index = config.variables.findIndex((v) => v.name === options.delete);
         if (index !== -1) {
           config.variables.splice(index, 1);
           saveConfig(config);
@@ -188,15 +192,15 @@ program
     if (options.set) {
       if (options.json) {
         try {
-          const fs = require('fs');
           const data = options.json.startsWith('{') || options.json.startsWith('[') 
             ? JSON.parse(options.json) 
             : JSON.parse(fs.readFileSync(options.json, 'utf-8'));
           config.variables = Array.isArray(data) ? data : [];
           saveConfig(config);
           console.log('Global variables updated via JSON.');
-        } catch (e: any) {
-          console.error('Failed to parse JSON for variables:', e.message);
+        } catch (e) {
+          const error = e as Error;
+          console.error('Failed to parse JSON for variables:', error.message);
         }
         return;
       }
@@ -208,7 +212,7 @@ program
         if (k) {
           const name = k.trim();
           const val = v.join('=').trim();
-          const existing = config.variables.find((x: any) => x.name === name);
+          const existing = config.variables.find((x) => x.name === name);
           if (existing) {
             existing.default = val;
           } else {
@@ -231,14 +235,11 @@ program
   .command('add <name> [json]')
   .description('Import/add a template from a JSON string or file')
   .option('-f, --file <path>', 'Path to JSON file containing template data')
-  .action((name, jsonStr, options) => {
-    const { loadConfig, saveConfig } = require('./config.js');
+  .action((name: string, jsonStr: string | undefined, options: { file?: string }) => {
     const config = loadConfig();
     try {
       let data;
       if (options.file) {
-        const fs = require('fs');
-        const path = require('path');
         const filePath = path.resolve(options.file);
         data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       } else if (jsonStr) {
@@ -260,8 +261,9 @@ program
       config.templates[name] = data;
       saveConfig(config);
       console.log(chalk.green(`✓ Template "${name}" saved successfully.`));
-    } catch (e: any) {
-      console.error(chalk.red(`Failed to parse template JSON: ${e.message}`));
+    } catch (e) {
+      const error = e as Error;
+      console.error(chalk.red(`Failed to parse template JSON: ${error.message}`));
       process.exit(1);
     }
   });
@@ -271,8 +273,7 @@ program
   .alias('rm')
   .description('Remove a learned template from the config')
   .option('-y, --yes', 'Automatically confirm removal')
-  .action(async (templateName, options) => {
-    const { loadConfig, saveConfig } = require('./config.js');
+  .action(async (templateName: string, options: { yes?: boolean }) => {
     const config = loadConfig();
     const inquirer = (await import('inquirer')).default;
     

@@ -1,12 +1,12 @@
 {
   "name": "pt-cli",
-  "version": "0.22.1",
+  "version": "0.23.0",
   "description": "Project Template CLI - Learn structures and initialize projects",
   "main": "dist/index.js",
   "bin": {
     "pt": "./dist/index.js"
   },
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "ts-node src/index.ts",

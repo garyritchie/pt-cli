@@ -1,8 +1,8 @@
-const YAML = require('yaml');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const chalk = require('chalk');
+import YAML from 'yaml';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import chalk from 'chalk';
 
 export const HOME_DIR = path.join(os.homedir(), '.pt');
 export const CONFIG_PATH = path.join(HOME_DIR, 'config.yaml');
@@ -105,24 +105,24 @@ export function loadConfig(): PtConfig {
       config.variables = [];
     } else if (!Array.isArray(config.variables)) {
       // Migrate from Record<string, string> to TemplateVariable[]
-      const oldVars = config.variables as any;
+      const oldVars = config.variables as unknown as Record<string, string>;
       config.variables = Object.entries(oldVars).map(([name, value]) => ({
         name,
         prompt: `Enter ${name}:`,
-        default: value as string
+        default: value
       }));
     }
 
     // Migration from 2.0 to 3.0
     if (config.version === '2.0') {
       for (const key in config.templates) {
-        const t = config.templates[key] as any;
-        if (t.name && !t.description) {
-          t.description = t.name;
-          delete t.name;
+        const t = config.templates[key];
+        if (t.description === undefined && (t as any).name) {
+          t.description = (t as any).name;
+          delete (t as any).name;
         }
-        if (t.type) {
-          delete t.type;
+        if ((t as any).type) {
+          delete (t as any).type;
         }
       }
       config.version = '3.0';
@@ -131,8 +131,9 @@ export function loadConfig(): PtConfig {
     }
 
     return config;
-  } catch (err: any) {
-    console.error(chalk.red(`\nError loading config: ${err.message}`));
+  } catch (err) {
+    const error = err as Error;
+    console.error(chalk.red(`\nError loading config: ${error.message}`));
     // If we have a backup, maybe suggest using it
     const backupPath = CONFIG_PATH + '.bak';
     if (fs.existsSync(backupPath)) {
@@ -159,12 +160,13 @@ export function saveConfig(config: PtConfig) {
 
     // 3. Rename temp file to actual config path
     fs.renameSync(tempPath, CONFIG_PATH);
-  } catch (err: any) {
-    console.error(chalk.red(`\nFailed to save config: ${err.message}`));
+  } catch (err) {
+    const error = err as Error;
+    console.error(chalk.red(`\nFailed to save config: ${error.message}`));
     if (fs.existsSync(tempPath)) {
       try { fs.unlinkSync(tempPath); } catch (e) {}
     }
-    throw err;
+    throw error;
   }
 }
 

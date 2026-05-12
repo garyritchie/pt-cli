@@ -197,6 +197,8 @@ export const DEFAULT_EXCLUDES = [
   '.DS_Store',
   'Thumbs.db',
   '.stignore',
+  '.stfolder',
+  '.stversions',
 ];
 
 // Check if a path should be excluded

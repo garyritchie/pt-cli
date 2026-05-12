@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode, getGlobalPostConfig } from './config.js';
+import { loadConfig, FolderNode, getGlobalPostConfig } from '../config.js';
 import chalk from 'chalk';
-import { processCopyFiles } from './substitute.js';
+import { processCopyFiles } from '../substitute.js';
 
 export interface InitOptions {
   skipPostConfig?: boolean;

@@ -1,12 +1,18 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { learn } from './learn.js';
-import { init } from './init.js';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadConfig, saveConfig, getTemplateNames, CONFIG_PATH, PtConfig, TemplateVariable } from './config.js';
+
+// Command imports
+import { learn } from './commands/learnCommand.js';
+import { init } from './commands/initCommand.js';
+import { configCommand } from './commands/configCommand.js';
+import { ignoreCommand } from './commands/ignoreCommand.js';
+import { variablesCommand } from './commands/variablesCommand.js';
+import { addCommand } from './commands/addCommand.js';
+import { removeCommand } from './commands/removeCommand.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
@@ -15,39 +21,39 @@ const program = new Command();
 
 program
   .name('pt')
-  .description('Project Template CLI - Learn and initialize project structures')
+  .description('Project Template CLI - Learn project structures and initialize new ones')
   .version(pkg.version, '-v', 'output the version number');
 
 program
-  .command('learn <path>')
-  .description('Scan a directory and learn its structure as a template')
-  .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
+  .command('learn [path]')
+  .description('Learn a project structure from an existing directory')
+  .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated)')
   .option('-y, --yes', 'Automatically confirm prompts')
   .option('--name <name>', 'Template name (skip prompt)')
   .option('--desc <description>', 'Template description (skip prompt)')
   .option('--json', 'Output template structure as JSON for sharing instead of saving')
-  .action(async (pathArg: string, options: { ignore?: string; yes?: boolean; name?: string; desc?: string; json?: boolean }) => {
-    await learn(pathArg, null, options);
+  .action(async (pathArg: string | undefined, options) => {
+    await learn(pathArg || '.', null, options);
   });
 
 program
-  .command('update <template> [path]')
-  .description('Update an existing template from a directory')
-  .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated, supports wildcards like DAILIES/*)')
+  .command('update <templateName> [sourcePath]')
+  .description('Update an existing template with new structure/files')
+  .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated)')
   .option('-y, --yes', 'Automatically confirm prompts')
   .option('--desc <description>', 'Template description (skip prompt)')
-  .action(async (templateName: string, sourcePath: string | undefined, options: { ignore?: string; yes?: boolean; desc?: string }) => {
+  .action(async (templateName: string, sourcePath: string | undefined, options) => {
     await learn(sourcePath || '.', templateName, options);
   });
 
 program
-  .command('init [type] [path]')
+  .command('init [templateName] [destPath]')
   .description('Initialize a new project from a learned template')
-  .option('--skip-post-config', 'Skip running post-config prompt')
+  .option('--skip-post-config', 'Skip running post-config tasks')
   .option('--dry-run', 'Show what would be created without making changes')
   .option('-y, --yes', 'Automatically answer yes to prompts')
   .option('--vars <variables>', 'Comma-separated key=value variables (e.g. key1=val1,key2=val2)')
-  .action(async (typeName: string | undefined, destPath: string | undefined, options: { skipPostConfig?: boolean; dryRun?: boolean; yes?: boolean; vars?: string }) => {
+  .action(async (typeName: string | undefined, destPath: string | undefined, options) => {
     await init(typeName, destPath, options);
   });
 
@@ -55,116 +61,13 @@ program
   .command('config [templateName]')
   .description('Show current config location and list templates, or export a specific template')
   .option('--json', 'Output config or specific template as JSON')
-  .action((templateName: string | undefined, options: { json?: boolean }) => {
-    const config = loadConfig();
-    
-    if (options.json) {
-      if (templateName) {
-        if (config.templates && config.templates[templateName]) {
-          const output = {
-            name: templateName,
-            ...config.templates[templateName]
-          };
-          console.log(JSON.stringify(output, null, 2));
-        } else {
-          console.error(chalk.red(`Error: Template "${templateName}" not found.`));
-          process.exit(1);
-        }
-      } else {
-        console.log(JSON.stringify(config, null, 2));
-      }
-      return;
-    }
-    
-    const names = getTemplateNames(config);
-    
-    console.log(chalk.cyan('Config Location:'), CONFIG_PATH);
-    console.log(chalk.cyan('\nLearned Templates:'));
-    if (names.length === 0) {
-      console.log(chalk.gray('  (none)'));
-    } else {
-      for (const name of names) {
-        const t = config.templates[name];
-        if (!t) continue;
-        console.log(chalk.white(`  - ${name}`), chalk.gray(`(${t.description})`));
-        if (t.templateRoot) {
-          console.log(chalk.gray(`      Source: ${t.templateRoot}`));
-        }
-        if (t.post_config && t.post_config.length > 0) {
-          console.log(chalk.cyan('      Post-config:'));
-          for (const task of t.post_config) {
-            const cmd = task.command || task.script || '(unknown)';
-            const typeFilter = task.type ? ` [type: ${task.type}]` : '';
-            console.log(chalk.gray(`        - ${cmd}${typeFilter}`));
-          }
-        }
-        if (t.post_copy && t.post_copy.length > 0) {
-          console.log(chalk.cyan('      post_copy:'));
-          for (const f of t.post_copy) {
-            console.log(chalk.gray(`        - ${f.src} → ${(f.dest || f.src)}`));
-          }
-        }
-      }
-    }
-    
-    // Show global ignore patterns
-    if (config.ignore && config.ignore.length > 0) {
-      console.log(chalk.cyan('\nIgnore Patterns (pt learn):'));
-      for (const p of config.ignore) {
-        console.log(chalk.gray(`  - ${p}`));
-      }
-    }
-    
-    // Show global post-config tasks
-    if (config.global_post_config && config.global_post_config.length > 0) {
-    console.log(chalk.cyan('\nGlobal Post-Config Tasks:'));
-      for (const task of config.global_post_config) {
-        const cmd = task.command || task.script || '(unknown)';
-        const desc = task.description ? ` — ${task.description}` : '';
-        const checked = task.checked !== false ? '[default: on]' : '[default: off]';
-        const typeFilter = task.type ? ` [type: ${task.type}]` : '';
-        console.log(chalk.gray(`  - ${cmd}${desc}`));
-        console.log(chalk.gray(`    ${checked}${typeFilter}`));
-      }
-    }
-    
-    // Show global variables
-    if (config.variables && config.variables.length > 0) {
-      console.log(chalk.cyan('\nGlobal Variables:'));
-      for (const v of config.variables) {
-        console.log(chalk.white(`  - ${v.name}:`), chalk.gray(v.default || '(no default)'));
-        if (v.prompt) console.log(chalk.gray(`    Prompt: ${v.prompt}`));
-        if (v.required) console.log(chalk.yellow(`    [Required]`));
-      }
-    }
-    
-    console.log(chalk.cyan('\nExample post-config in config.yaml:'));
-    console.log(chalk.gray(`
-  my_template:
-    description: "My standard web project"
-    post_config:
-      - command: "git init"
-        description: "Initialize git repository"
-      - command: "npm install"
-        description: "Install npm dependencies"
-        type: "javascript"`));
-  });
+  .action(configCommand);
 
 program
   .command('ignore [patterns]')
   .description('View or set global ignore patterns (comma-separated)')
   .option('--set', 'Set the ignore patterns to the provided value')
-  .action((patterns: string | undefined, options: { set?: boolean }) => {
-    const config = loadConfig();
-    
-    if (options.set) {
-      config.ignore = patterns ? patterns.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '') : [];
-      saveConfig(config);
-      console.log('Ignore patterns updated:', config.ignore);
-    } else {
-      console.log('Current ignore patterns:', config.ignore || []);
-    }
-  });
+  .action(ignoreCommand);
 
 program
   .command('variables [pairs]')
@@ -172,134 +75,19 @@ program
   .option('--set', 'Set the variables to the provided pairs')
   .option('--json <data>', 'Set variables via JSON string or file')
   .option('--delete <key>', 'Delete a specific global variable')
-  .action((pairs: string | undefined, options: { set?: boolean; json?: string; delete?: string }) => {
-    const config = loadConfig();
-    
-    if (options.delete) {
-      if (config.variables) {
-        const index = config.variables.findIndex((v) => v.name === options.delete);
-        if (index !== -1) {
-          config.variables.splice(index, 1);
-          saveConfig(config);
-          console.log(`Global variable "${options.delete}" removed.`);
-        } else {
-          console.log(`Global variable "${options.delete}" not found.`);
-        }
-      }
-      return;
-    }
-
-    if (options.set) {
-      if (options.json) {
-        try {
-          const data = options.json.startsWith('{') || options.json.startsWith('[') 
-            ? JSON.parse(options.json) 
-            : JSON.parse(fs.readFileSync(options.json, 'utf-8'));
-          config.variables = Array.isArray(data) ? data : [];
-          saveConfig(config);
-          console.log('Global variables updated via JSON.');
-        } catch (e) {
-          const error = e as Error;
-          console.error('Failed to parse JSON for variables:', error.message);
-        }
-        return;
-      }
-
-      if (!config.variables) config.variables = [];
-      const parts = pairs ? pairs.split(',') : [];
-      for (const part of parts) {
-        const [k, ...v] = part.split('=');
-        if (k) {
-          const name = k.trim();
-          const val = v.join('=').trim();
-          const existing = config.variables.find((x) => x.name === name);
-          if (existing) {
-            existing.default = val;
-          } else {
-            config.variables.push({
-              name,
-              prompt: `Enter ${name}:`,
-              default: val
-            });
-          }
-        }
-      }
-      saveConfig(config);
-      console.log('Global variables updated.');
-    } else {
-      console.log('Current global variables:', config.variables || []);
-    }
-  });
+  .action(variablesCommand);
 
 program
   .command('add <name> [json]')
   .description('Import/add a template from a JSON string or file')
   .option('-f, --file <path>', 'Path to JSON file containing template data')
-  .action((name: string, jsonStr: string | undefined, options: { file?: string }) => {
-    const config = loadConfig();
-    try {
-      let data;
-      if (options.file) {
-        const filePath = path.resolve(options.file);
-        data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      } else if (jsonStr) {
-        data = JSON.parse(jsonStr);
-      } else {
-        console.error('Error: Either a JSON string or --file <path> must be provided.');
-        process.exit(1);
-      }
-      
-      if (!config.templates) config.templates = {};
-      
-      // Basic validation: ensure we aren't accidentally adding a full config object
-      if (data && data.templates && typeof data.templates === 'object') {
-        console.error(chalk.red('Error: The provided JSON appears to be a full configuration file, not a single template.'));
-        console.error(chalk.gray('If you want to import a specific template from it, extract that template object first.'));
-        process.exit(1);
-      }
-
-      config.templates[name] = data;
-      saveConfig(config);
-      console.log(chalk.green(`✓ Template "${name}" saved successfully.`));
-    } catch (e) {
-      const error = e as Error;
-      console.error(chalk.red(`Failed to parse template JSON: ${error.message}`));
-      process.exit(1);
-    }
-  });
+  .action(addCommand);
 
 program
   .command('remove <template>')
   .alias('rm')
   .description('Remove a learned template from the config')
   .option('-y, --yes', 'Automatically confirm removal')
-  .action(async (templateName: string, options: { yes?: boolean }) => {
-    const config = loadConfig();
-    const inquirer = (await import('inquirer')).default;
-    
-    if (!config.templates[templateName]) {
-      console.error(chalk.red(`Template "${templateName}" not found.`));
-      process.exit(1);
-    }
-
-    let confirmRemoval = options.yes;
-    if (!confirmRemoval) {
-      const response = await inquirer.prompt({
-        type: 'confirm',
-        name: 'confirmRemoval',
-        message: `Are you sure you want to remove template "${templateName}"?`,
-        default: false
-      });
-      confirmRemoval = response.confirmRemoval;
-    }
-
-    if (confirmRemoval) {
-      delete config.templates[templateName];
-      saveConfig(config);
-      console.log(chalk.green(`✓ Template "${templateName}" removed.`));
-    } else {
-      console.log(chalk.gray('Removal cancelled.'));
-    }
-  });
+  .action(removeCommand);
 
 program.parse(process.argv);

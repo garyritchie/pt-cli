@@ -87,7 +87,6 @@ For full details on usage, configurations, and exclusions, please refer to the d
 - [Detailed Usage](doc/usage.md) - Learn, Initialize, Update, and Remove commands.
 - [Configuration Guide](doc/configuration.md) - Template variables, post-config tasks, file copying, and more.
 - [Exclusions](doc/exclusions.md) - Learn about default ignored files and how to set custom patterns.
-- [Development](doc/development.md) - How to build, lint, and understand the project structure.
 
 ## Agent Integration
 

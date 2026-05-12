@@ -14,8 +14,7 @@ import { variablesCommand } from './commands/variablesCommand.js';
 import { addCommand } from './commands/addCommand.js';
 import { removeCommand } from './commands/removeCommand.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
+import pkg from '../package.json' with { type: 'json' };
 
 const program = new Command();
 

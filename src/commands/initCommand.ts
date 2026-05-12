@@ -4,6 +4,7 @@ import inquirer from 'inquirer';
 import { loadConfig, FolderNode, getGlobalPostConfig } from '../config.js';
 import chalk from 'chalk';
 import { processCopyFiles } from '../substitute.js';
+import { execSync } from 'child_process';
 
 export interface InitOptions {
   skipPostConfig?: boolean;
@@ -278,6 +279,18 @@ export async function init(targetName: string | undefined, destPath: string | un
       fs.writeFileSync(path.join(resolvedDest, 'post_config.sh'), bashContent);
       try { fs.chmodSync(path.join(resolvedDest, 'post_config.sh'), 0o755); } catch(e) {}
       fs.writeFileSync(path.join(resolvedDest, 'post_config.bat'), batContent);
+
+      // Execute the appropriate script
+      console.log(chalk.cyan("\nExecuting post-config tasks..."));
+      try {
+        const scriptCmd = process.platform === 'win32' ? 'post_config.bat' : './post_config.sh';
+        execSync(scriptCmd, { 
+          cwd: resolvedDest, 
+          stdio: 'inherit' 
+        });
+      } catch (e) {
+        console.error(chalk.red("\nError: Some post-config tasks failed. Check the output above."));
+      }
     }
   }
 

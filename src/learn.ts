@@ -230,7 +230,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
         checked: true // Include all in structure by default
       }))
     });
-    const selectedStructure = foldersResponse.selectedStructure;
+    selectedStructure = foldersResponse.selectedStructure;
 
     const copyFoldersResponse = await inquirer.prompt({
       type: 'checkbox',

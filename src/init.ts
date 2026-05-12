@@ -115,22 +115,29 @@ export async function init(targetName: string | undefined, destPath: string | un
 
   // 1. Create structure
   createStructure(resolvedDest, template.folders, options.dryRun);
+  
+  // Check if templateRoot exists (if it's defined)
+  const templateRootExists = template.templateRoot && fs.existsSync(template.templateRoot);
+  if (template.templateRoot && !templateRootExists) {
+    console.warn(chalk.yellow(`\nWarning: Template source directory not found: ${template.templateRoot}`));
+    console.warn(chalk.gray("Folder structure created, but files/boilerplate will be skipped."));
+  }
 
   // 2. Process copy_files
-  if (template.copy_files && template.templateRoot) {
+  if (template.copy_files && templateRootExists) {
     if (options.dryRun) console.log(chalk.yellow("[DRY RUN] Processing copy_files..."));
     else console.log(chalk.cyan("Processing copy_files..."));
-    await processCopyFiles(template.templateRoot, resolvedDest, template, variables, options.dryRun);
+    await processCopyFiles(template.templateRoot!, resolvedDest, template, variables, options.dryRun);
   }
 
 
   // 3. Process post_copy (executable scripts)
-  if (template.post_copy && template.templateRoot) {
+  if (template.post_copy && templateRootExists) {
     if (options.dryRun) console.log(chalk.yellow("[DRY RUN] Processing post_copy..."));
     else console.log(chalk.cyan("Processing post_copy..."));
 
     for (const file of template.post_copy) {
-      const srcPath = path.join(template.templateRoot, file.src);
+      const srcPath = path.join(template.templateRoot!, file.src);
       const destPath = path.join(resolvedDest, file.dest || file.src);
 
       if (fs.existsSync(srcPath)) {

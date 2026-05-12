@@ -188,11 +188,13 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
 
   let selectedFiles: string[] = [];
   let selectedFolders: string[] = [];
+  let selectedStructure: string[] = [];
   
   if (options.yes || options.json) {
     // If --yes, auto-select the defaults
     selectedFiles = rootFiles.filter(f => ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()));
-    selectedFolders = rootDirs.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
+    selectedStructure = rootDirs; // Include all folders in structure
+    selectedFolders = rootDirs.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p)); // Only copy specific ones recursively
   } else {
     const filesResponse = await inquirer.prompt({
       type: 'checkbox',
@@ -214,8 +216,8 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
 
     const foldersResponse = await inquirer.prompt({
       type: 'checkbox',
-      name: 'selectedFolders',
-      message: 'Select folders to copy recursively as boilerplate:',
+      name: 'selectedStructure',
+      message: 'Select folders to include in the template structure (skeleton):',
       loop: false,
       theme: {
         icon: {
@@ -225,10 +227,28 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       },
       choices: rootDirs.map(d => ({ 
         name: d, 
+        checked: true // Include all in structure by default
+      }))
+    });
+    const selectedStructure = foldersResponse.selectedStructure;
+
+    const copyFoldersResponse = await inquirer.prompt({
+      type: 'checkbox',
+      name: 'selectedFolders',
+      message: 'Select folders to copy RECURSIVELY as boilerplate (with contents):',
+      loop: false,
+      theme: {
+        icon: {
+          checked: chalk.green('[x] '),
+          unchecked: '[ ] ',
+        }
+      },
+      choices: selectedStructure.map((d: string) => ({ 
+        name: d, 
         checked: ['APP', 'scripts', 'bin'].some(p => d === p) 
       }))
     });
-    selectedFolders = foldersResponse.selectedFolders;
+    selectedFolders = copyFoldersResponse.selectedFolders;
   }
 
   const copy_files: any[] = [];
@@ -242,7 +262,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const templateConfig: TemplateConfig = {
     description: description,
     templateRoot: resolvedPath,
-    folders: folders.filter(f => selectedFolders.includes(f.name)),
+    folders: folders.filter(f => selectedStructure.includes(f.name)),
     copy_files: copy_files,
     variables: variables.length > 0 ? variables : undefined
   };

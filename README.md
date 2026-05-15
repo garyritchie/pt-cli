@@ -4,25 +4,28 @@ A CLI tool to record directory structures as templates and initialize new projec
 
 ```mermaid
 graph LR
-    subgraph Input_Layer ["Pattern Inputs"]
-        A[Existing Project Structures]
-        B[Template JSON/YAML]
+    subgraph Inputs ["Source & Configuration"]
+        Existing[Existing Project]
+        Config[(Template Config)]
     end
 
-    C{pt-cli}
+    Engine[[pt-cli]]
+
+    subgraph Outputs ["Generated Scaffolding"]
+        RSA[Replicated Structure A]
+        RSB[Replicated Structure B]
+    end
+
+    %% Flow logic
+    Existing -- Learn --> Engine
+    Config -- Read/Write --> Engine
+    Engine -- Initialize --> RSA
+    Engine -- Initialize --> RSB
     
-    subgraph Output_Layer ["Results"]
-        D[Replicated Structure A]
-        E[Replicated Structure B]
-    end
+    %% Separate the Update logic to avoid crossing lines
+    Existing -. Update .-> Engine
 
-    A -->|Learn| C
-    B <-->|Config| C
-    C --> |Init| D
-    C --> |Init| E
-    C --> |Update| A
-
-    style C color:#000,fill:#f9f,stroke:#333,stroke-width:2px
+    style Engine fill:#f9f,stroke:#333,stroke-width:2px,color:#000
 ```
 
 ## The Pipeline Benefit

@@ -55,12 +55,12 @@ graph LR
 ### Installation
 
 ```bash
-# Clone this repository
+npm i @garyr/pt-cli
+
+# ...or clone this repository, then:
 cd pt-cli
 npm install
 npm run build
-
-# Link for global use
 npm link
 ```
 

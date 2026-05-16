@@ -65,10 +65,10 @@ export function configCommand(templateName: string | undefined, options: ConfigO
     }
   }
   
-  // Show global post-config tasks
-  if (config.global_post_config && config.global_post_config.length > 0) {
-  console.log(chalk.cyan('\nGlobal Post-Config Tasks:'));
-    for (const task of config.global_post_config) {
+  // Show default post-config tasks
+  if (config.default_post_config && config.default_post_config.length > 0) {
+  console.log(chalk.cyan('\nDefault Post-Config Tasks:'));
+    for (const task of config.default_post_config) {
       const cmd = task.command || task.script || '(unknown)';
       const desc = task.description ? ` — ${task.description}` : '';
       const checked = task.checked !== false ? '[default: on]' : '[default: off]';

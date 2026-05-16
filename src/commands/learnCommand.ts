@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile, TemplateVariable, CopyFileEntry, PostConfigTask } from '../config.js';
+import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile, TemplateVariable, CopyFileEntry, PostConfigTask, getDefaultPostConfig } from '../config.js';
 import chalk from 'chalk';
 
 export interface LearnOptions {
@@ -305,6 +305,54 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   if (postConfigTasks.length > 0) {
     templateConfig.post_config = postConfigTasks;
     if (!options.json) console.log(chalk.cyan(`Auto-detected ${postConfigTasks.length} post_config action(s) from script.`));
+  }
+
+  // Handle default_post_config tasks
+  const defaultPostConfig = getDefaultPostConfig(config);
+  const defaultApplicableTasks = defaultPostConfig.filter(t => !t.type || t.type === targetName);
+
+  if (defaultApplicableTasks.length > 0) {
+    let selectedTaskNames: string[] = [];
+    if (options.yes || options.json) {
+      selectedTaskNames = defaultApplicableTasks.map(t => t.command || t.script || '');
+    } else {
+      const choices: Array<{name: string; value: string; checked?: boolean}> = [];
+      for (const t of defaultApplicableTasks) {
+        const cmd = t.command || t.script || '(no command)';
+        const desc = t.description ? ` (${t.description})` : '';
+        choices.push({
+          name: `${cmd}${desc}`,
+          value: cmd,
+          checked: t.checked !== false
+        });
+      }
+      const response = await inquirer.prompt({
+        type: 'checkbox',
+        name: 'selected',
+        message: 'Select default post-config tasks to include in this template:',
+        loop: false,
+        theme: {
+          icon: {
+            cursor: chalk.green('[x] ')
+          }
+        },
+        choices
+      });
+      selectedTaskNames = response.selected || [];
+    }
+
+    if (selectedTaskNames.length > 0) {
+      if (!templateConfig.post_config) templateConfig.post_config = [];
+      for (const t of defaultApplicableTasks) {
+        const cmd = t.command || t.script || '';
+        if (selectedTaskNames.includes(cmd)) {
+          const alreadyExists = templateConfig.post_config.some(existing => existing.command === t.command && existing.script === t.script);
+          if (!alreadyExists) {
+             templateConfig.post_config.push(t);
+          }
+        }
+      }
+    }
   }
 
   // 3. Detect executables at root

@@ -58,7 +58,7 @@ export interface PtConfig {
   version: string;
   templates: Record<string, TemplateConfig>;
   ignore?: string[];  // top-level folder ignore patterns for pt learn
-  global_post_config?: PostConfigTask[];  // global post-config tasks applied to all projects
+  default_post_config?: PostConfigTask[];  // default post-config tasks applied to all projects
   variables?: TemplateVariable[];         // global variables for substitution
 }
 
@@ -74,7 +74,7 @@ export function loadConfig(): PtConfig {
     const defaultConfig: PtConfig = {
       version: '3.0',
       templates: {},
-      global_post_config: [],
+      default_post_config: [],
       variables: []
     };
     // Don't automatically save a default config on load.
@@ -95,9 +95,16 @@ export function loadConfig(): PtConfig {
       config.ignore = [];
     }
 
-    // Initialize global_post_config for configs that don't have it
-    if (config.global_post_config === undefined) {
-      config.global_post_config = [];
+    // Initialize default_post_config for configs that don't have it
+    if (config.default_post_config === undefined) {
+      // Migrate from global_post_config if it exists
+      if ((config as any).global_post_config !== undefined) {
+        config.default_post_config = (config as any).global_post_config;
+        delete (config as any).global_post_config;
+        saveConfig(config);
+      } else {
+        config.default_post_config = [];
+      }
     }
 
     // Initialize variables for configs that don't have it
@@ -175,13 +182,13 @@ export function getTemplateNames(config: PtConfig): string[] {
 }
 
 /**
- * Get global post-config tasks with defaults applied for unchecked entries.
- * Global tasks that have checked=true (or undefined, which defaults to true)
+ * Get default post-config tasks with defaults applied for unchecked entries.
+ * Default tasks that have checked=true (or undefined, which defaults to true)
  * will be auto-checked. Tasks with checked=false stay unchecked by default.
  */
-export function getGlobalPostConfig(config: PtConfig): PostConfigTask[] {
-  const global = config.global_post_config || [];
-  return global.map(t => ({
+export function getDefaultPostConfig(config: PtConfig): PostConfigTask[] {
+  const defaults = config.default_post_config || [];
+  return defaults.map(t => ({
     ...t,
     checked: t.checked !== false // default to true if not explicitly false
   }));

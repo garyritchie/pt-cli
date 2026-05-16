@@ -4,7 +4,7 @@ Config is stored at `~/.pt/config.yaml` and contains:
 
 - `version`: Config version
 - `templates`: Dictionary of learned templates with folder structure, `templateRoot`, `copy_files`, `post_copy`, and `post_config`
-- `global_post_config`: Array of post-config tasks applied to **every** project (regardless of template)
+- `default_post_config`: Array of default post-config tasks to suggest when learning a template
 - `ignore`: Global folder ignore patterns for `pt learn`
 - `variables`: Global variable suggestions for `pt learn` (name, prompt, default, required)
 
@@ -110,14 +110,16 @@ Each task supports:
 - Permission errors: caught and logged
 - If all tasks fail: warn but don't block project creation
 
-## Global Post-Config
+## Default Post-Config
 
-Global post-config tasks are defined at the top level of `~/.pt/config.yaml` under `global_post_config`. They are **always** applied to every project initialized with `pt init`, regardless of which template is used. This eliminates the need to repeat boilerplate setup (e.g. `git init`) in every template.
+Default post-config tasks are defined at the top level of `~/.pt/config.yaml` under `default_post_config`. They serve as suggestions when creating or updating templates via `pt learn`. 
+
+Unlike previous versions, default tasks are **not** automatically applied during `pt init`. Instead, you select which ones to include when learning a template, and those selections are baked into the template's `post_config` list. This eliminates the need to repeat boilerplate setup (e.g. `git init`) across templates while keeping each template fully self-contained.
 
 ### Configuration
 
 ```yaml
-global_post_config:
+default_post_config:
   - command: "git init"
     description: "Initialize git repository"
   - command: "git add -A && git commit -m 'Initial commit'"
@@ -130,7 +132,7 @@ global_post_config:
 
 ### Fields
 
-Each global task supports the same fields as template post-config:
+Each default task supports the same fields as template post-config:
 
 | Field         | Description                                                                      |
 | ------------- | -------------------------------------------------------------------------------- |
@@ -141,21 +143,18 @@ Each global task supports the same fields as template post-config:
 
 ### Behavior
 
-- **`--yes` mode**: all global tasks are applied automatically, alongside template tasks.
-- **`--skip-post-config`**: no global or template tasks are applied.
-- **`--dry-run`**: global tasks are listed with a `[global]` prefix.
-- **Interactive mode**: global and template tasks are shown in separate checkbox groups ("Global post-config" and "Template post-config"). Global tasks default to checked; `checked: false` overrides this.
-- **No deduplication**: if a global task and a template task have the same command, both appear — the user selects or deselects independently.
+- **`pt learn --yes`**: all applicable default tasks are added automatically to the new template's `post_config`.
+- **Interactive mode (`pt learn`)**: applicable default tasks are shown in a checkbox group. Default tasks default to checked; `checked: false` overrides this.
 
 ### Viewing
 
-Global tasks cannot be added via `pt add` or `pt learn` — they must be edited directly in `~/.pt/config.yaml`.
+Default tasks cannot be added via `pt add` or `pt learn` — they must be edited directly in `~/.pt/config.yaml` or viewed with `pt config`.
 
 ## Global Variables
 
 Global variables are defined at the root of `~/.pt/config.yaml`. They serve as **suggestions** when creating or updating templates via `pt learn`.
 
-Unlike global post-config tasks, global variables are **not** automatically applied during `pt init`. Instead, they are "stamped" into individual templates during the learning process. This allows you to maintain a consistent set of metadata (like `author`, `license`, or `version`) across all your project types without forcing those values onto old templates or external configurations.
+Unlike default post-config tasks, global variables are also **not** automatically applied during `pt init`. Instead, they are "stamped" into individual templates during the learning process. This allows you to maintain a consistent set of metadata (like `author`, `license`, or `version`) across all your project types without forcing those values onto old templates or external configurations.
 
 ### Configuration
 
@@ -330,5 +329,5 @@ During `pt init`:
 2. **Copy `copy_files`** — with optional variable substitution and chmod
 3. **Copy `post_copy`** — executable scripts (auto-detected or manual)
 4. **Generate sharing metadata** — root `.info.md` and `post_config.sh`/`post_config.bat` are created so the result can be easily shared as a template
-5. **Merge post-config tasks** — combine global post-config (from `~/.pt/config.yaml`) with template post-config tasks; filter by project type
+5. **Merge post-config tasks** — evaluate the template's `post_config` tasks; filter by project type
 6. **Execute post-config tasks** — shell commands (interactive prompt, `--yes` for all, or `--skip-post-config` to omit)

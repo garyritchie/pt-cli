@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode, getGlobalPostConfig } from '../config.js';
+import { loadConfig, FolderNode } from '../config.js';
 import chalk from 'chalk';
 import { processCopyFiles } from '../substitute.js';
 import { execSync } from 'child_process';
@@ -185,11 +185,8 @@ export async function init(targetName: string | undefined, destPath: string | un
     console.log(chalk.gray(`  [DRY RUN] Would create .info.md`));
   }
 
-  // Merge global + template post_config tasks
-  const globalPostConfig = getGlobalPostConfig(config);
-  const globalApplicableTasks = globalPostConfig.filter(t => !t.type || t.type === typeName!);
-  const templateApplicableTasks = template.post_config?.filter(t => !t.type || t.type === typeName!) || [];
-  const allTasks = [...globalApplicableTasks, ...templateApplicableTasks];
+  // Use template post_config tasks
+  const allTasks = template.post_config?.filter(t => !t.type || t.type === typeName!) || [];
 
   if (allTasks.length > 0) {
     // Determine which tasks to include
@@ -204,8 +201,7 @@ export async function init(targetName: string | undefined, destPath: string | un
       console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
       for (const t of allTasks) {
         const desc = t.description ? ` (${t.description})` : '';
-        const source = globalApplicableTasks.includes(t) ? '[global]' : '[template]';
-        console.log(chalk.gray(`  ${source} - ${t.command || t.script}${desc}`));
+        console.log(chalk.gray(`  [template] - ${t.command || t.script}${desc}`));
       }
     } else if (options.yes) {
       // All tasks selected
@@ -213,24 +209,10 @@ export async function init(targetName: string | undefined, destPath: string | un
     } else if (allTasks.length === 0) {
       selectedTaskNames = [];
     } else {
-      // Checkbox prompt: show global + template tasks grouped
+      // Checkbox prompt
       const choices: Array<{name: string; value: string; checked?: boolean}> = [];
       
-      // Group separator for global
-      choices.push({ name: '── Global post-config ──', value: '__group__global__', checked: true });
-      for (const t of globalApplicableTasks) {
-        const cmd = t.command || t.script || '(no command)';
-        const desc = t.description ? ` (${t.description})` : '';
-        choices.push({
-          name: `${cmd}${desc}`,
-          value: cmd,
-          checked: t.checked !== false
-        });
-      }
-      
-      // Group separator for template
-      choices.push({ name: '── Template post-config ──', value: '__group__template__', checked: true });
-      for (const t of templateApplicableTasks) {
+      for (const t of allTasks) {
         const cmd = t.command || t.script || '(no command)';
         const desc = t.description ? ` (${t.description})` : '';
         choices.push({

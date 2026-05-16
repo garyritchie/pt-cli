@@ -1,0 +1,39 @@
+name: Publish to NPM
+
+on:
+  push:
+    tags:
+      # Use glob patterns (not regex). 
+      # Matches tags like 1.0.1, 20.10.5, etc.
+      - '[0-9]*.[0-9]*.[0-9]*' 
+      # Matches pre-releases like 1.0.0-beta
+      - '[0-9]*.[0-9]*.[0-9]*-*'
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Check out the code
+      - uses: actions/checkout@v4
+
+      # 2. Setup Node.js environment
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # 3. Install dependencies (clean install)
+      - run: npm ci
+
+      # 4. Build the project (TypeScript -> JS)
+      - run: npm run build --if-present
+
+      # 5. Publish to NPM
+      # We use the secret we added earlier to authenticate
+      - run: npm publish --access public
+        # env:
+        #   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

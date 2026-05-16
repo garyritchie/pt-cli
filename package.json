@@ -1,6 +1,6 @@
 {
-  "name": "pt-cli",
-  "version": "0.25.0",
+  "name": "@garyr/pt-cli",
+  "version": "0.25.1",
   "description": "Project Template CLI - Learn structures and initialize projects",
   "main": "dist/index.js",
   "bin": {
@@ -17,9 +17,15 @@
     "build:windows": "bun build ./src/index.ts --compile --target=bun-windows-x64 --outfile ../BUILD/pt-cli/pt-win.exe",
     "build:all": "npm run build:linux && npm run build:macos && npm run build:windows"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "keywords": [
+    "project management",
+    "template",
+    "utility"
+  ],
+  "repository": {
+    "url": "https://github.com/garyritchie/pt-cli"
+  },
   "dependencies": {
     "commander": "^12.1.0",
     "inquirer": "^12.3.0",

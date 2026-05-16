@@ -4,20 +4,20 @@
 
 ```bash
 # Learn a new template (auto-detects post-config tasks)
-pt learn /path/to/project
+pt learn /path/to/PROJECT
 
 # Update an existing template (use current directory if no path given)
 pt update <template_name>
-pt update <template_name> /path/to/project
+pt update <template_name> /path/to/PROJECT
 
 # Ignore specific folders during learning
-pt learn /path/to/project --ignore=DAILIES/*,PARKING_LOT/*,REFERENCE/*
+pt learn /path/to/PROJECT --ignore=DAILIES/*,PARKING_LOT/*,REFERENCE/*
 
 # Ignore a folder name at any depth
-pt learn /path/to/project --ignore=**/.godot/
+pt learn /path/to/PROJECT --ignore=**/.godot/
 
 # Non-interactive mode (useful for AI agents)
-pt learn /path/to/project --name my_template --desc "My new template" --yes
+pt learn /path/to/PROJECT --name my_template --desc "My new template" --yes
 ```
 
 ### Automatic Variable Detection
@@ -33,16 +33,16 @@ During `pt learn` or `pt update`, the tool automatically scans text files at the
 
 ```bash
 # Initialize from a template (auto-suggests post-config tasks)
-pt init <template_name> /path/to/new/project
+pt init <template_name> /path/to/new/PROJECT
 
 # Skip post-config tasks
-pt init <template_name> /path/to/new/project --skip-post-config
+pt init <template_name> /path/to/new/PROJECT --skip-post-config
 
 # Dry run (preview actions without execution)
-pt init <template_name> /path/to/new/project --dry-run
+pt init <template_name> /path/to/new/PROJECT --dry-run
 
-# Non-interactive mode with variables (useful for AI agents)
-pt init <template_name> /path/to/new/project --yes --vars project_name=foo,author=bar
+# Non-interactive mode with variables (useful for an API or AI agents)
+pt init <template_name> /path/to/new/PROJECT --yes --vars project_name=foo,author=bar
 ```
 
 ## Remove a template

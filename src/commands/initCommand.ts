@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode } from '../config.js';
+import { loadConfig, FolderNode, sanitizePath } from '../config.js';
 import chalk from 'chalk';
 import { processCopyFiles } from '../substitute.js';
 import { execSync } from 'child_process';
@@ -145,7 +145,7 @@ export async function init(targetName: string | undefined, destPath: string | un
 
     for (const file of template.post_copy) {
       const srcPath = path.join(template.templateRoot!, file.src);
-      const destPath = path.join(resolvedDest, file.dest || file.src);
+      const destPath = path.join(resolvedDest, sanitizePath(file.dest || file.src));
 
       if (fs.existsSync(srcPath)) {
         if (options.dryRun) {
@@ -285,7 +285,7 @@ export async function init(targetName: string | undefined, destPath: string | un
 
 function createStructure(dirPath: string, folders: FolderNode[], dryRun: boolean = false) {
   for (const folder of folders) {
-    const fullDirPath = path.join(dirPath, folder.name);
+    const fullDirPath = path.join(dirPath, sanitizePath(folder.name));
 
     if (dryRun) {
       console.log(chalk.gray(`  [DRY RUN] Would create directory: ${fullDirPath}`));

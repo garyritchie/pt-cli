@@ -42,7 +42,7 @@ Default post-config tasks are stored in `~/.pt/config.yaml` under `default_post_
 
 Tasks with `checked: false` stay unchecked by default in interactive mode. In `pt learn --yes` mode, **all applicable** default tasks are included.
 
-Use `pt config` to view currently configured default tasks. To add default tasks, edit `~/.pt/config.yaml` directly or use `pt add` for template management (config is YAML-only at this time).
+Use `pt config` to view currently configured default tasks. To update default tasks, you can use `pt default-post-config --set --json '...'` to apply a new JSON array of tasks. Alternatively, you can edit `~/.pt/config.yaml` directly.
 
 ## Global Variables
 

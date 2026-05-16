@@ -146,9 +146,14 @@ Each default task supports the same fields as template post-config:
 - **`pt learn --yes`**: all applicable default tasks are added automatically to the new template's `post_config`.
 - **Interactive mode (`pt learn`)**: applicable default tasks are shown in a checkbox group. Default tasks default to checked; `checked: false` overrides this.
 
-### Viewing
+### Management
 
-Default tasks cannot be added via `pt add` or `pt learn` — they must be edited directly in `~/.pt/config.yaml` or viewed with `pt config`.
+You can view current default tasks using `pt config` or `pt default-post-config`.
+To update default tasks programmatically or via CLI, use the `pt default-post-config` command:
+- `pt default-post-config`: List current default post-config tasks.
+- `pt default-post-config --set --json '...'`: Replace the default post-config tasks list via a JSON string or file.
+
+Alternatively, you can edit `~/.pt/config.yaml` directly.
 
 ## Global Variables
 

@@ -13,6 +13,7 @@ import { ignoreCommand } from './commands/ignoreCommand.js';
 import { variablesCommand } from './commands/variablesCommand.js';
 import { addCommand } from './commands/addCommand.js';
 import { removeCommand } from './commands/removeCommand.js';
+import { defaultPostConfigCommand } from './commands/defaultPostConfigCommand.js';
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -75,6 +76,13 @@ program
   .option('--json <data>', 'Set variables via JSON string or file')
   .option('--delete <key>', 'Delete a specific global variable')
   .action(variablesCommand);
+
+program
+  .command('default-post-config')
+  .description('View or set default post-config tasks')
+  .option('--set', 'Set the default post-config tasks via JSON')
+  .option('--json <data>', 'JSON string or file containing tasks array')
+  .action(defaultPostConfigCommand);
 
 program
   .command('add <name> [json]')

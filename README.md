@@ -33,8 +33,8 @@ graph LR
 `pt-cli` is built to reduce boilerplate setup and ensure consistency across your workspaces. In a production pipeline, standardization is key to lowering the friction of cognitive load. `pt` helps by:
 
 - **Instantly replicating proven architectures:** Stop recreating folder structures manually. `pt learn` saves the shape of any project.
-- **Automating the setup grind:** With post-config tasks, `pt init` can automatically run `npm install`, `git init`, or setup python virtual environments for you.
-- **Global post-config:** Configure shared tasks (e.g. `git init`, `git lfs install`) once in `~/.pt/config.yaml` and have them apply to every project type automatically.
+- **Automating the setup grind:** With post-config tasks, `pt init` can run commands like `npm install`, `git init`, or setup python virtual environments for you.
+- **Global post-config:** Configure shared tasks (e.g. `git init`, `git lfs install`) once in `~/.pt/config.yaml` and have them apply to every new project automatically.
 - **Agentic automation:** Fully supports headless operation via non-interactive flags and includes a skill for integration with AI agents.
 - **File copying & templating:** Beyond directories, it allows injecting variables into key files (`package.json`, `README.md`, etc.) and automatically ports over executable scripts.
 
@@ -43,11 +43,11 @@ graph LR
 - Learn any directory structure and save it as a reusable template
 - Initialize new projects from learned templates
 - Define template variables for dynamic file customization
-- Auto-detect and suggest post-config setup tasks
 - **Automatic Variable Detection:** Scans text files for `{{ var }}` syntax during `learn`/`update`
+- Auto-detect and suggest post-config setup tasks
 - Configure global post-config tasks in `~/.pt/config.yaml` (apply to all projects)
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
-- Easily package and share templates with auto-generated metadata files or JSON export/import
+- Share templates or use as an API with JSON export/import
 - Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation
 
 ## Quick Start
@@ -55,7 +55,7 @@ graph LR
 ### Installation
 
 ```bash
-# Clone and setup
+# Clone this repository
 cd pt-cli
 npm install
 npm run build
@@ -68,24 +68,22 @@ npm link
 
 ```bash
 # Learn an existing project structure
-pt learn /path/to/project
+pt learn /path/to/PROJECT
 
 # Scaffold a new project from a template
-pt init <template_name> /path/to/new/project
+pt init <template_name> /path/to/NEW_PROJECT
 
 # List available templates and configurations
 pt config
 
 # Export an existing template as JSON
-pt config my_template --json > template.json
+pt config my-template --json > my-template.json
 
 # Import a template from JSON
-pt add my_new_template --file template.json
+pt add my-new-template --file my-new-template.json
 ```
 
 ## Documentation
-
-For full details on usage, configurations, and exclusions, please refer to the documents in the `doc/` directory:
 
 - [Detailed Usage](doc/usage.md) - Learn, Initialize, Update, and Remove commands.
 - [Configuration Guide](doc/configuration.md) - Template variables, post-config tasks, file copying, and more.
@@ -94,11 +92,13 @@ For full details on usage, configurations, and exclusions, please refer to the d
 ## Development
 
 ### Project Structure
+
 - `src/index.ts`: Entry point and command registration.
 - `src/commands/`: Individual command handler modules.
 - `src/config.ts`: Configuration loading, saving, and type definitions.
 
 ### Technical Notes
+
 - **ESM Migration**: The project is now pure ESM. All internal imports must use the `.js` extension.
 - **Development Tooling**: Use `tsx` for running `.ts` files directly (`npm run dev`).
 - **Building**: Use `tsc` to compile to `dist/`.

@@ -18,7 +18,7 @@ graph LR
 
     %% Flow logic
     Existing -- Learn --> Engine
-    Config -- Read/Write --> Engine
+    Config <-- Read/Write --> Engine
     Engine -- Initialize --> RSA
     Engine -- Initialize --> RSB
     

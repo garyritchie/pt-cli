@@ -3,6 +3,7 @@ import path from 'path';
 import inquirer from 'inquirer';
 import { loadConfig, saveConfig, FolderNode, TemplateConfig, getTemplateNames, shouldExclude, shouldIgnore, shouldExcludeFile, PostCopyFile, TemplateVariable, CopyFileEntry, PostConfigTask, getDefaultPostConfig } from '../config.js';
 import chalk from 'chalk';
+import { downloadAndExtract } from '../remote.js';
 
 export interface LearnOptions {
   ignore?: string;
@@ -12,11 +13,20 @@ export interface LearnOptions {
   json?: boolean;
 }
 
+
 export async function learn(sourcePath: string, updateTemplate: string | null = null, options: LearnOptions = {}): Promise<void> {
-  const resolvedPath = path.resolve(sourcePath);
+  let resolvedPath: string;
+
+  // Phase 1: Remote Check
+  if (sourcePath.startsWith('http')) {
+    console.log(chalk.cyan(`Downloading remote template from: ${sourcePath}...`));
+    resolvedPath = await downloadAndExtract(sourcePath);
+  } else {
+    resolvedPath = path.resolve(sourcePath);
+  }
   
   if (!fs.existsSync(resolvedPath)) {
-    console.error(chalk.red(`Error: Path "${sourcePath}" does not exist.`));
+    console.error(chalk.red(`Error: Path "${resolvedPath}" does not exist.`));
     process.exit(1);
   }
 

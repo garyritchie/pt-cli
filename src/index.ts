@@ -49,6 +49,7 @@ program
 program
   .command('init [templateName] [destPath]')
   .description('Initialize a new project from a learned template')
+  .option('-f, --file <jsonPath>', 'Initialize directly from a JSON template file without adding it to local config')
   .option('--skip-post-config', 'Skip running post-config tasks')
   .option('--dry-run', 'Show what would be created without making changes')
   .option('-y, --yes', 'Automatically answer yes to prompts')

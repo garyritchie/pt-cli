@@ -34,6 +34,25 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   const config = loadConfig();
   const existingNames = getTemplateNames(config);
 
+  // Check for template configuration JSON file (.pt-template.json or template.json)
+  let fileTemplateConfig: Partial<TemplateConfig> & { name?: string } = {};
+  const jsonConfigPaths = [
+    path.join(resolvedPath, '.pt-template.json'),
+    path.join(resolvedPath, 'template.json')
+  ];
+  for (const jPath of jsonConfigPaths) {
+    if (fs.existsSync(jPath)) {
+      try {
+        const fileContent = fs.readFileSync(jPath, 'utf-8');
+        fileTemplateConfig = JSON.parse(fileContent);
+        if (!options.json) console.log(chalk.cyan(`Auto-detected template configurations from ${path.basename(jPath)}`));
+        break;
+      } catch (e) {
+        console.warn(chalk.yellow(`Warning: Failed to parse ${path.basename(jPath)}: ${(e as Error).message}`));
+      }
+    }
+  }
+
   // Check for .info.md
   let infoName = '';
   let infoDesc = '';
@@ -60,6 +79,9 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   } else {
     if (options.name) {
       targetName = options.name;
+    } else if (fileTemplateConfig.name) {
+      targetName = fileTemplateConfig.name;
+      if (!options.json) console.log(chalk.cyan(`Auto-detected template name from JSON: ${targetName}`));
     } else if (infoName) {
       targetName = infoName;
       if (!options.json) console.log(chalk.cyan(`Auto-detected template name from .info.md: ${targetName}`));
@@ -106,7 +128,10 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       }
     }
   } else {
-    if (infoDesc) {
+    if (fileTemplateConfig.description) {
+      description = fileTemplateConfig.description;
+      if (!options.json) console.log(chalk.cyan(`Auto-detected template description from JSON: ${description}`));
+    } else if (infoDesc) {
       description = infoDesc;
       if (!options.json) console.log(chalk.cyan(`Auto-detected template description from .info.md: ${description}`));
     } else if (options.yes || options.json) {
@@ -136,6 +161,8 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   // Merge with existing variables if update
   if (isUpdate && config.templates[updateTemplate].variables) {
     variables = [...config.templates[updateTemplate].variables];
+  } else if (fileTemplateConfig.variables && Array.isArray(fileTemplateConfig.variables)) {
+    variables = [...fileTemplateConfig.variables];
   }
 
   // Add detected variables if not already present
@@ -194,7 +221,9 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
 
   // 1. Structure (skeleton)
-  const folders = extractStructure(resolvedPath, resolvedPath, ignorePatterns);
+  const folders = fileTemplateConfig.folders && Array.isArray(fileTemplateConfig.folders)
+    ? fileTemplateConfig.folders
+    : extractStructure(resolvedPath, resolvedPath, ignorePatterns);
 
   // 2. Content Selection (Root only)
   const rootEntries = fs.readdirSync(resolvedPath, { withFileTypes: true })
@@ -270,51 +299,59 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
 
   const copy_files: CopyFileEntry[] = [];
-  for (const f of selectedFiles) {
-    copy_files.push({ src: f, dest: f, substitute_variables: true });
-  }
-  for (const d of selectedFolders) {
-    copy_files.push({ src: d, dest: d, substitute_variables: true });
+  if (fileTemplateConfig.copy_files && Array.isArray(fileTemplateConfig.copy_files)) {
+    copy_files.push(...fileTemplateConfig.copy_files);
+  } else {
+    for (const f of selectedFiles) {
+      copy_files.push({ src: f, dest: f, substitute_variables: true });
+    }
+    for (const d of selectedFolders) {
+      copy_files.push({ src: d, dest: d, substitute_variables: true });
+    }
   }
 
   const templateConfig: TemplateConfig = {
     description: description,
     templateRoot: resolvedPath,
-    folders: folders.filter(f => selectedStructure.includes(f.name)),
+    folders: fileTemplateConfig.folders ? folders : folders.filter(f => selectedStructure.includes(f.name)),
     copy_files: copy_files,
     variables: variables.length > 0 ? variables : undefined
   };
 
   // Check for post_config scripts
-  const postConfigTasks: PostConfigTask[] = [];
-  const shPath = path.join(resolvedPath, 'post_config.sh');
-  const batPath = path.join(resolvedPath, 'post_config.bat');
-  if (fs.existsSync(shPath)) {
-    const lines = fs.readFileSync(shPath, 'utf-8').split('\n');
-    let currentDesc = '';
-    for (const line of lines) {
-      if (line.startsWith('echo "Running: ')) {
-        currentDesc = line.substring(15, line.length - 1).replace(/"$/, '');
-      } else if (line.trim() && !line.startsWith('#') && !line.startsWith('echo ')) {
-        postConfigTasks.push({ command: line.trim(), description: currentDesc || line.trim() });
-        currentDesc = '';
+  let postConfigTasks: PostConfigTask[] = [];
+  if (fileTemplateConfig.post_config && Array.isArray(fileTemplateConfig.post_config)) {
+    postConfigTasks = [...fileTemplateConfig.post_config];
+  } else {
+    const shPath = path.join(resolvedPath, 'post_config.sh');
+    const batPath = path.join(resolvedPath, 'post_config.bat');
+    if (fs.existsSync(shPath)) {
+      const lines = fs.readFileSync(shPath, 'utf-8').split('\n');
+      let currentDesc = '';
+      for (const line of lines) {
+        if (line.startsWith('echo "Running: ')) {
+          currentDesc = line.substring(15, line.length - 1).replace(/"$/, '');
+        } else if (line.trim() && !line.startsWith('#') && !line.startsWith('echo ')) {
+          postConfigTasks.push({ command: line.trim(), description: currentDesc || line.trim() });
+          currentDesc = '';
+        }
       }
-    }
-  } else if (fs.existsSync(batPath)) {
-    const lines = fs.readFileSync(batPath, 'utf-8').split('\n');
-    let currentDesc = '';
-    for (const line of lines) {
-      if (line.startsWith('echo Running: ')) {
-        currentDesc = line.substring(14).trim();
-      } else if (line.trim() && !line.startsWith('::') && !line.startsWith('@echo') && !line.startsWith('echo ')) {
-        postConfigTasks.push({ command: line.trim(), description: currentDesc || line.trim() });
-        currentDesc = '';
+    } else if (fs.existsSync(batPath)) {
+      const lines = fs.readFileSync(batPath, 'utf-8').split('\n');
+      let currentDesc = '';
+      for (const line of lines) {
+        if (line.startsWith('echo Running: ')) {
+          currentDesc = line.substring(14).trim();
+        } else if (line.trim() && !line.startsWith('::') && !line.startsWith('@echo') && !line.startsWith('echo ')) {
+          postConfigTasks.push({ command: line.trim(), description: currentDesc || line.trim() });
+          currentDesc = '';
+        }
       }
     }
   }
   if (postConfigTasks.length > 0) {
     templateConfig.post_config = postConfigTasks;
-    if (!options.json) console.log(chalk.cyan(`Auto-detected ${postConfigTasks.length} post_config action(s) from script.`));
+    if (!options.json && !fileTemplateConfig.post_config) console.log(chalk.cyan(`Auto-detected ${postConfigTasks.length} post_config action(s) from script.`));
   }
 
   // Handle default_post_config tasks
@@ -374,7 +411,11 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     }
   }
 
-  if (detectedExecutables.length > 0) {
+  if (fileTemplateConfig.post_copy && Array.isArray(fileTemplateConfig.post_copy)) {
+    templateConfig.post_copy = fileTemplateConfig.post_copy;
+    const postCopySrcs = fileTemplateConfig.post_copy.map(f => f.src);
+    templateConfig.copy_files = templateConfig.copy_files?.filter(cf => !postCopySrcs.includes(cf.src));
+  } else if (detectedExecutables.length > 0) {
     if (!options.json) {
       console.log(chalk.cyan("\nAuto-detected " + detectedExecutables.length + " executable file(s) at root:"));
       for (const file of detectedExecutables) {

@@ -35,7 +35,7 @@ pt learn https://gitea.example.com/username/my-template
 #### How it works:
 1. **URL Translation:** If a GitHub or Gitea URL is provided, `pt` automatically translates the repository URL to its corresponding tarball download endpoint (e.g., `/archive/refs/heads/main.tar.gz`).
 2. **Download & Extraction:** The tool downloads the archive into a secure temporary folder and extracts it.
-3. **Template Discovery:** The extracted directory is scanned for metadata (`.info.md`, `post_config.sh`, `post_config.bat`) and variable placeholders (`{{ var }}`), matching local learn functionality exactly.
+3. **Template Discovery:** The extracted directory is scanned for metadata (`.pt-template.json`, `template.json`, `.info.md`, `post_config.sh`, `post_config.bat`) and variable placeholders (`{{ var }}`), matching local learn functionality exactly.
 4. **Save Config:** The template config (skeleton structure, files, variables) is saved to the local configuration, pointing to the temporary folder as the `templateRoot`.
 
 
@@ -62,6 +62,25 @@ pt init <template_name> /path/to/new/PROJECT --dry-run
 
 # Non-interactive mode with variables (useful for an API or AI agents)
 pt init <template_name> /path/to/new/PROJECT --yes --vars project_name=foo,author=bar
+
+# Initialize directly from a JSON template file (no config.yaml registration)
+pt init /path/to/new/PROJECT --file my-template.json --yes
+```
+
+### Direct JSON Scaffolding (`--file`)
+
+The `--file` option allows you to scaffold a project directly from a JSON template file **without** registering it in your local `~/.pt/config.yaml`. This is ideal for:
+
+- One-off project creation from a shared template
+- CI/CD pipelines where you don't want to modify the user's config
+- Receiving a template JSON from a colleague and using it immediately
+
+```bash
+# The template name is read from the JSON's "name" field
+pt init ./new-project --file template.json --yes
+
+# With variable overrides
+pt init ./new-project --file template.json --yes --vars client=Acme,author=Jane
 ```
 
 ## Remove a template
@@ -105,10 +124,65 @@ For more details on how these are used, see the [Configuration Guide](configurat
 
 You can share your templates with others simply by sharing a directory (or a ZIP of it). When someone else runs `pt learn` on it, `pt` will automatically detect the following files at the root:
 
+- `.pt-template.json` or `template.json`: **Full template configuration** — name, description, variables (with prompts, defaults, required flags), folders, copy_files, post_config, and post_copy. This is the most complete and portable way to share templates.
 - `.info.md`: Used to automatically set the template's name (from the first `# Heading`) and description.
 - `post_config.sh` or `post_config.bat`: Parsed to automatically populate the `post_config` actions in the user's `config.yaml`.
 
+**Priority order:** `.pt-template.json` > `template.json` > `.info.md` > `post_config.sh`/`.bat`. JSON config files take precedence over `.info.md` for name/description and over shell scripts for post_config tasks.
+
 These files are also automatically generated at the root of a new project whenever you run `pt init`, making it trivial to initialize a project, zip it up, and share it with teammates as a fully-featured template!
+
+### JSON Template Config File (`.pt-template.json`)
+
+The JSON template config file is the recommended way to make a template directory fully self-describing and portable. Place it at the root of your template directory:
+
+```json
+{
+  "name": "my-web-app",
+  "description": "A Node.js web application with Express",
+  "variables": [
+    { "name": "project_name", "prompt": "Project name:", "default": "my-app", "required": true },
+    { "name": "author", "prompt": "Author name:", "default": "" }
+  ],
+  "folders": [
+    { "name": "src", "children": [] },
+    { "name": "tests", "children": [] }
+  ],
+  "copy_files": [
+    { "src": "package.json", "dest": "package.json", "substitute_variables": true },
+    { "src": "README.md", "dest": "README.md", "substitute_variables": true }
+  ],
+  "post_config": [
+    { "command": "git init", "description": "Initialize git repository" },
+    { "command": "npm install", "description": "Install dependencies" }
+  ],
+  "post_copy": [
+    { "src": "bin/start.sh", "dest": "bin/start.sh" }
+  ]
+}
+```
+
+When `pt learn` encounters this file, **all fields are used as pre-configured defaults**, skipping the corresponding interactive prompts. Any fields not specified in the JSON file will fall back to normal auto-detection (file scanning, executable detection, etc.).
+
+### Portable Template Round-Trip Workflow
+
+The complete workflow for sharing a fully portable template:
+
+```bash
+# 1. Export an existing template to JSON
+pt config my-template --json > .pt-template.json
+
+# 2. Place the JSON file at the root of your template directory
+cp .pt-template.json /path/to/template-dir/
+
+# 3. Share the directory (zip, git, etc.)
+
+# 4. Recipient learns the template — all metadata auto-detected
+pt learn /path/to/template-dir --yes
+
+# 5. Or scaffold directly without registering in config
+pt init ./new-project --file .pt-template.json --yes
+```
 
 ### JSON Export & Import
 
@@ -129,6 +203,12 @@ pt add <template_name> --file my_template.json
 Or from a JSON string:
 ```bash
 pt add <template_name> '{"description":"My Template","files":{...}}'
+```
+
+#### Direct JSON Scaffolding (no config registration)
+To scaffold a project directly from a JSON file without adding the template to your config:
+```bash
+pt init ./destination --file my_template.json --yes
 ```
 
 #### Exporting Full Config

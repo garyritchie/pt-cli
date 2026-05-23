@@ -17,6 +17,8 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
    When a matching template exists, initialize it using the non-interactive flags.
    - **Command:** `pt init <template_name> <destination_path> --yes`
    - If the template requires variables, pass them: `pt init <template_name> <destination_path> --yes --vars key1=value1,key2=value2`
+   - **Direct JSON scaffolding:** To scaffold from a JSON template file without registering it in `config.yaml`:
+     `pt init <destination_path> --file <json_path> --yes`
    - *Never* run `pt init` without `--yes`, as interactive prompts will block you.
    - Note any errors from auto-executed post-config tasks (like `npm install` failing) and correct them if necessary.
 
@@ -27,10 +29,57 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
      `pt learn https://github.com/username/my-template --name my_template --desc "Description" --yes`
    - Explain to the user that you've captured this template for future use.
    - **Automatic Variable Detection:** `pt learn` and `pt update` automatically scan text files (at root and one level deep) for `{{ variable_name }}` placeholders. You can add these to files (e.g., `README.md`, `.makerc`) and run `pt update <template> . --yes` to have them registered as template variables without manual configuration.
+   - **JSON Template Config:** If the source directory contains a `.pt-template.json` or `template.json` file, `pt learn` will auto-detect name, description, variables, folders, copy_files, post_config, and post_copy from it — skipping the corresponding interactive prompts.
 
 4. **Template Maintenance (`pt rm`):**
    If a template is obsolete or requested for deletion, use `pt rm`.
    - **Command:** `pt rm <template_name> --yes`
+
+## Template Sharing & Portability
+
+Templates are designed to be fully portable. There are two approaches to sharing:
+
+### 1. Directory-based Sharing (recommended for complete templates)
+
+Place a `.pt-template.json` at the root of your template directory. This file can include all template metadata:
+
+```json
+{
+  "name": "my-template",
+  "description": "Description of the template",
+  "variables": [
+    { "name": "project_name", "prompt": "Project name:", "default": "my-app", "required": true }
+  ],
+  "post_config": [
+    { "command": "git init", "description": "Initialize git" }
+  ]
+}
+```
+
+When someone runs `pt learn /path/to/shared-dir --yes`, all metadata is auto-detected from this file.
+
+**Priority order:** `.pt-template.json` > `template.json` > `.info.md` > `post_config.sh`/`.bat`
+
+### 2. JSON Export/Import (for config-only sharing)
+
+```bash
+# Export a template to JSON
+pt config my-template --json > my-template.json
+
+# Import into another user's config
+pt add my-template --file my-template.json
+
+# Or scaffold directly without importing
+pt init ./new-project --file my-template.json --yes
+```
+
+### Round-trip Workflow
+
+The complete portable template workflow:
+1. `pt config my-template --json > .pt-template.json` — export config
+2. Copy `.pt-template.json` into the template source directory
+3. Share the directory (zip, git repo, etc.)
+4. Recipient: `pt learn /path/to/shared-dir --yes` — auto-detects everything
 
 ## Default Post-Config
 

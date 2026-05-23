@@ -42,6 +42,8 @@ When learning a template, `pt` scans the source directory for common patterns an
 
 Additionally, if `pt learn` finds a `post_config.sh` or `post_config.bat` file at the root of the directory, it will parse the scripts and automatically load the tasks into the `post_config` array.
 
+If the directory contains a `.pt-template.json` or `template.json` file with a `post_config` array, those tasks take precedence over shell script parsing. See [Usage Guide — JSON Template Config](usage.md#json-template-config-file-pt-templatejson) for the full JSON config format.
+
 ### The 80% Philosophy
 
 `pt` is designed to get you **80% of the way there** automatically. For complex templates, you are encouraged to:

@@ -150,8 +150,30 @@ export function loadConfig(): PtConfig {
   }
 }
 
+export function normalizeVariable(v: TemplateVariable): TemplateVariable {
+  const result: any = { name: v.name };
+  if (v.prompt !== undefined) result.prompt = v.prompt;
+  if (v.default !== undefined) result.default = v.default;
+  if (v.required !== undefined) result.required = v.required;
+  return result;
+}
+
 export function saveConfig(config: PtConfig) {
   ensureConfigDir();
+
+  // Normalize variable key ordering (forces 'name' to be first in serialized YAML)
+  if (config.variables && Array.isArray(config.variables)) {
+    config.variables = config.variables.map(normalizeVariable);
+  }
+  if (config.templates) {
+    for (const key of Object.keys(config.templates)) {
+      const template = config.templates[key];
+      if (template.variables && Array.isArray(template.variables)) {
+        template.variables = template.variables.map(normalizeVariable);
+      }
+    }
+  }
+
   const content = YAML.stringify(config);
   const tempPath = CONFIG_PATH + '.tmp';
   const backupPath = CONFIG_PATH + '.bak';

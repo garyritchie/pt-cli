@@ -49,6 +49,8 @@ graph LR
 - Configure global post-config tasks in `~/.pt/config.yaml` (apply to all projects)
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
 - Share templates or use as an API with JSON export/import
+- **Direct JSON scaffolding:** Initialize projects from a JSON file without registering in `config.yaml`
+- **Portable template configs:** `.pt-template.json` files make shared directories fully self-describing
 - Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation
 
 ## Quick Start
@@ -85,6 +87,9 @@ pt config my-template --json > my-template.json
 
 # Import a template from JSON
 pt add my-new-template --file my-new-template.json
+
+# Scaffold directly from a JSON file (no config registration)
+pt init ./new-project --file my-template.json --yes
 ```
 
 ## Documentation

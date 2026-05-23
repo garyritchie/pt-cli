@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode, sanitizePath } from '../config.js';
+import { loadConfig, FolderNode, sanitizePath, TemplateConfig } from '../config.js';
 import chalk from 'chalk';
 import { processCopyFiles } from '../substitute.js';
 import { execSync } from 'child_process';
@@ -11,47 +11,69 @@ export interface InitOptions {
   dryRun?: boolean;
   yes?: boolean;
   vars?: string;
+  file?: string;
 }
 
 export async function init(targetName: string | undefined, destPath: string | undefined, options: InitOptions = {}) {
   const config = loadConfig();
 
   let typeName: string | undefined = targetName;
+  let dest: string | undefined = destPath;
+  let template: TemplateConfig;
 
-  // If no name provided, list templates
-  if (!typeName) {
-    const names = Object.keys(config.templates);
-    if (names.length === 0) {
-      console.log(chalk.red("No templates found. Run 'pt learn <path>' first."));
-      return;
+  if (options.file) {
+    // If direct template file is specified, targetName could be the destPath if destPath is omitted
+    if (typeName && !dest) {
+      dest = typeName;
+      typeName = undefined;
     }
 
-    if (options.yes) {
-      console.error(chalk.red("No project type specified and running in non-interactive mode."));
+    try {
+      const fileContent = fs.readFileSync(options.file, 'utf-8');
+      template = JSON.parse(fileContent);
+    } catch (e) {
+      console.error(chalk.red(`Error: Failed to read/parse template file "${options.file}": ${(e as Error).message}`));
       process.exit(1);
     }
-    const { selected } = await inquirer.prompt({
-      type: 'list',
-      name: 'selected',
-      message: 'Select Project Type:',
-      loop: false,
-      theme: {
-        icon: {
-          cursor: chalk.green('[x] ')
-        }
-      },
-      choices: names.map(n => ({ name: n, value: n }))
-    });
-    typeName = selected;
+
+    if (!typeName) {
+      typeName = (template as any).name || 'custom-template';
+    }
+  } else {
+    // If no name provided, list templates
+    if (!typeName) {
+      const names = Object.keys(config.templates);
+      if (names.length === 0) {
+        console.log(chalk.red("No templates found. Run 'pt learn <path>' first."));
+        return;
+      }
+
+      if (options.yes) {
+        console.error(chalk.red("No project type specified and running in non-interactive mode."));
+        process.exit(1);
+      }
+      const { selected } = await inquirer.prompt({
+        type: 'list',
+        name: 'selected',
+        message: 'Select Project Type:',
+        loop: false,
+        theme: {
+          icon: {
+            cursor: chalk.green('[x] ')
+          }
+        },
+        choices: names.map(n => ({ name: n, value: n }))
+      });
+      typeName = selected;
+    }
+
+    template = config.templates[typeName!];
+    if (!template) {
+      console.error(chalk.red(`Template "${typeName}" not found.`));
+      process.exit(1);
+    }
   }
 
-  const template = config.templates[typeName!];
-  if (!template) {
-    console.error(chalk.red(`Template "${typeName}" not found.`));
-    process.exit(1);
-  }
-
-  let dest: string | undefined = destPath;
   if (!dest) {
     if (options.yes) {
       console.error(chalk.red("No destination path specified and running in non-interactive mode."));

@@ -19,11 +19,12 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
    - If the template requires variables, pass them: `pt init <template_name> <destination_path> --yes --vars key1=value1,key2=value2`
    - *Never* run `pt init` without `--yes`, as interactive prompts will block you.
    - Note any errors from auto-executed post-config tasks (like `npm install` failing) and correct them if necessary.
-   - Note any errors from auto-executed post-config tasks (like `npm install` failing) and correct them if necessary.
 
 3. **Capturing Knowledge (`pt learn`):**
    If you spend time establishing a new, complex directory structure or configuration (e.g., a specific flavor of an Express backend with testing hooks), save it!
    - **Command:** `pt learn <source_path> --name <template_name> --desc "<Description>" --yes`
+   - **Remote Templates:** You can also learn from a remote Git repository or archive URL directly! Pass the HTTP/HTTPS URL as the `<source_path>`:
+     `pt learn https://github.com/username/my-template --name my_template --desc "Description" --yes`
    - Explain to the user that you've captured this template for future use.
    - **Automatic Variable Detection:** `pt learn` and `pt update` automatically scan text files (at root and one level deep) for `{{ variable_name }}` placeholders. You can add these to files (e.g., `README.md`, `.makerc`) and run `pt update <template> . --yes` to have them registered as template variables without manual configuration.
 

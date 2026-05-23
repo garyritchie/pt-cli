@@ -20,6 +20,25 @@ pt learn /path/to/PROJECT --ignore=**/.godot/
 pt learn /path/to/PROJECT --name my_template --desc "My new template" --yes
 ```
 
+### Remote Template Learning
+
+`pt learn` supports learning templates directly from a remote Git repository or tarball archive by passing an `http://` or `https://` URL:
+
+```bash
+# Learn a template directly from a GitHub repository
+pt learn https://github.com/username/my-template
+
+# Learn a template from a Gitea repository
+pt learn https://gitea.example.com/username/my-template
+```
+
+#### How it works:
+1. **URL Translation:** If a GitHub or Gitea URL is provided, `pt` automatically translates the repository URL to its corresponding tarball download endpoint (e.g., `/archive/refs/heads/main.tar.gz`).
+2. **Download & Extraction:** The tool downloads the archive into a secure temporary folder and extracts it.
+3. **Template Discovery:** The extracted directory is scanned for metadata (`.info.md`, `post_config.sh`, `post_config.bat`) and variable placeholders (`{{ var }}`), matching local learn functionality exactly.
+4. **Save Config:** The template config (skeleton structure, files, variables) is saved to the local configuration, pointing to the temporary folder as the `templateRoot`.
+
+
 ### Automatic Variable Detection
 
 During `pt learn` or `pt update`, the tool automatically scans text files at the root and in the first-level subdirectories for variable placeholders using the `{{ variable_name }}` syntax. 

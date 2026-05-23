@@ -41,6 +41,7 @@ graph LR
 ## Features at a Glance
 
 - Learn any directory structure and save it as a reusable template
+- **Remote Templates:** Learn templates directly from a remote repository or archive URL (GitHub, Gitea, etc.)
 - Initialize new projects from learned templates
 - Define template variables for dynamic file customization
 - **Automatic Variable Detection:** Scans text files for `{{ var }}` syntax during `learn`/`update`
@@ -67,8 +68,11 @@ npm link
 ### Basic Commands
 
 ```bash
-# Learn an existing project structure
+# Learn an existing local project structure
 pt learn /path/to/PROJECT
+
+# Learn a template from a remote repository (GitHub, Gitea, or tarball URL)
+pt learn https://github.com/garyritchie/pt_godot
 
 # Scaffold a new project from a template
 pt init <template_name> /path/to/NEW_PROJECT

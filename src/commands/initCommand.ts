@@ -251,7 +251,8 @@ export async function init(targetName: string | undefined, destPath: string | un
         loop: false,
         theme: {
           icon: {
-            cursor: chalk.green('▶ ')
+            checked: chalk.green('[x] '),
+            unchecked: '[ ] ',
           }
         },
         choices

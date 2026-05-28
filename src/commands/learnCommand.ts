@@ -158,11 +158,30 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
 
   let variables: TemplateVariable[] = [];
   
-  // Merge with existing variables if update
-  if (isUpdate && config.templates[updateTemplate].variables) {
-    variables = [...config.templates[updateTemplate].variables];
-  } else if (fileTemplateConfig.variables && Array.isArray(fileTemplateConfig.variables)) {
-    variables = [...fileTemplateConfig.variables];
+  // During updates, merge existing template variables with JSON file variables
+  if (isUpdate) {
+    // Start with existing template variables
+    if (config.templates[updateTemplate].variables) {
+      variables = [...config.templates[updateTemplate].variables];
+    }
+    // Then add JSON variables (overwrite/update existing ones with same name)
+    if (fileTemplateConfig.variables && Array.isArray(fileTemplateConfig.variables)) {
+      for (const v of fileTemplateConfig.variables) {
+        const existingIndex = variables.findIndex(existing => existing.name === v.name);
+        if (existingIndex !== -1) {
+          // Update existing variable with JSON values (but preserve other fields)
+          variables[existingIndex] = { ...variables[existingIndex], ...v };
+        } else {
+          // Add new variable
+          variables.push({ ...v });
+        }
+      }
+    }
+  } else {
+    // For new templates, use JSON variables if available
+    if (fileTemplateConfig.variables && Array.isArray(fileTemplateConfig.variables)) {
+      variables = [...fileTemplateConfig.variables];
+    }
   }
 
   // Add detected variables if not already present

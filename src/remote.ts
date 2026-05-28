@@ -10,11 +10,14 @@ export async function downloadAndExtract(url: string): Promise<string> {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pt-template-'));
     let downloadUrl = url;
 
+    // Strip trailing slash and .git suffix before converting to archive URL
+    let cleanUrl = url.replace(/\/$/, '').replace(/\.git$/, '');
+    
     // Convert GitHub/Gitea URLs to Zip/Tarball endpoints
     if (url.includes('github.com')) {
-        downloadUrl = url.replace(/\/$/, '') + '/archive/refs/heads/main.tar.gz';
+        downloadUrl = cleanUrl + '/archive/refs/heads/main.tar.gz';
     } else if (url.includes('gitea')) {
-        downloadUrl = url.replace(/\/$/, '') + '/archive/main.tar.gz';
+        downloadUrl = cleanUrl + '/archive/main.tar.gz';
     }
 
     const response = await fetch(downloadUrl);

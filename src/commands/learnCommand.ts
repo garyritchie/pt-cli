@@ -380,7 +380,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
         loop: false,
         theme: {
           icon: {
-            cursor: chalk.green('[x] ')
+            cursor: chalk.green('▶ ')
           }
         },
         choices

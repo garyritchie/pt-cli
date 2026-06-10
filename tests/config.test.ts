@@ -368,10 +368,26 @@ test('saveConfig with empty config file', () => {
   // Create empty config file
   fs.writeFileSync(CONFIG_PATH, '');
   
-  // Try to load - should throw error
-  assert.throws(() => {
+  // loadConfig calls process.exit(1) on error, so we need to mock it
+  // to prevent the test runner from dying
+  let exitCalled = false;
+  let exitCode: number | undefined;
+  const originalExit = process.exit;
+  process.exit = ((code?: number) => {
+    exitCalled = true;
+    exitCode = code;
+    throw new Error('process.exit called');
+  }) as any;
+
+  try {
     loadConfig();
-  }, /Config file is empty/, 'Should throw error for empty config file');
+    assert.fail('loadConfig should have called process.exit');
+  } catch (e) {
+    assert.ok(exitCalled, 'process.exit should have been called');
+    assert.strictEqual(exitCode, 1, 'Should exit with code 1');
+  } finally {
+    process.exit = originalExit;
+  }
 
   // Clean up
   if (fs.existsSync(CONFIG_PATH)) {
@@ -551,7 +567,6 @@ test('loadConfig handles migration from v2.0', () => {
     templates: {
       'test-template': {
         name: 'Test Template',
-        description: 'Test Description',
         type: 'web',
         folders: []
       }

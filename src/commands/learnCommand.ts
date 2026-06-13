@@ -262,59 +262,71 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     selectedStructure = rootDirs; // Include all folders in structure
     selectedFolders = rootDirs.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p)); // Only copy specific ones recursively
   } else {
-    const filesResponse = await inquirer.prompt({
-      type: 'checkbox',
-      name: 'selectedFiles',
-      message: 'Select root files to include as boilerplate:',
-      loop: false,
-      theme: {
-        icon: {
-          checked: chalk.green('[x] '),
-          unchecked: '[ ] ',
-        }
-      },
-      choices: rootFiles.map(f => ({ 
-        name: f, 
-        checked: ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()) 
-      }))
-    });
-    selectedFiles = filesResponse.selectedFiles;
+    if (rootFiles.length > 0) {
+      const filesResponse = await inquirer.prompt({
+        type: 'checkbox',
+        name: 'selectedFiles',
+        message: 'Select root files to include as boilerplate:',
+        loop: false,
+        theme: {
+          icon: {
+            checked: chalk.green('[x] '),
+            unchecked: '[ ] ',
+          }
+        },
+        choices: rootFiles.map(f => ({ 
+          name: f, 
+          checked: ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()) 
+        }))
+      });
+      selectedFiles = filesResponse.selectedFiles;
+    } else {
+      selectedFiles = [];
+    }
 
-    const foldersResponse = await inquirer.prompt({
-      type: 'checkbox',
-      name: 'selectedStructure',
-      message: 'Select folders to include in the template structure (skeleton):',
-      loop: false,
-      theme: {
-        icon: {
-          checked: chalk.green('[x] '),
-          unchecked: '[ ] ',
-        }
-      },
-      choices: rootDirs.map(d => ({ 
-        name: d, 
-        checked: true // Include all in structure by default
-      }))
-    });
-    selectedStructure = foldersResponse.selectedStructure;
+    if (rootDirs.length > 0) {
+      const foldersResponse = await inquirer.prompt({
+        type: 'checkbox',
+        name: 'selectedStructure',
+        message: 'Select folders to include in the template structure (skeleton):',
+        loop: false,
+        theme: {
+          icon: {
+            checked: chalk.green('[x] '),
+            unchecked: '[ ] ',
+          }
+        },
+        choices: rootDirs.map(d => ({ 
+          name: d, 
+          checked: true // Include all in structure by default
+        }))
+      });
+      selectedStructure = foldersResponse.selectedStructure;
+    } else {
+      selectedStructure = [];
+    }
 
-    const copyFoldersResponse = await inquirer.prompt({
-      type: 'checkbox',
-      name: 'selectedFolders',
-      message: 'Select folders to copy RECURSIVELY as boilerplate (with contents):',
-      loop: false,
-      theme: {
-        icon: {
-          checked: chalk.green('[x] '),
-          unchecked: '[ ] ',
-        }
-      },
-      choices: selectedStructure.map((d: string) => ({ 
-        name: d, 
-        checked: ['APP', 'scripts', 'bin'].some(p => d === p) 
-      }))
-    });
-    selectedFolders = copyFoldersResponse.selectedFolders;
+    if (selectedStructure.length > 0) {
+      const copyFoldersResponse = await inquirer.prompt({
+        type: 'checkbox',
+        name: 'selectedFolders',
+        message: 'Select folders to copy RECURSIVELY as boilerplate (with contents):',
+        loop: false,
+        theme: {
+          icon: {
+            checked: chalk.green('[x] '),
+            unchecked: '[ ] ',
+          }
+        },
+        choices: selectedStructure.map((d: string) => ({ 
+          name: d, 
+          checked: ['APP', 'scripts', 'bin'].some(p => d === p) 
+        }))
+      });
+      selectedFolders = copyFoldersResponse.selectedFolders;
+    } else {
+      selectedFolders = [];
+    }
   }
 
   const copy_files: CopyFileEntry[] = [];

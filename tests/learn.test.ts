@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
+import inquirer from 'inquirer';
 
 // Force a temporary home directory for testing before importing anything from the CLI
 const testHome = path.join(process.cwd(), '.test-home-learn');
@@ -759,6 +760,77 @@ test('learn update merges new variables with existing ones', async () => {
     const existingVar = vars.find(v => v.name === 'existing_var')!;
     assert.strictEqual(existingVar.default, 'old-default', 'Existing var default should be preserved');
   } finally {
+    rmrf(srcDir);
+    cleanConfig();
+    rmrf(testHome);
+  }
+});
+
+test('learn in interactive mode handles empty directory without empty checkbox errors', async () => {
+  const srcDir = createSourceDir('.test-learn-empty-interactive');
+  cleanConfig();
+  
+  const originalPrompt = inquirer.prompt;
+  const promptCalls: any[] = [];
+  inquirer.prompt = async (questions: any) => {
+    promptCalls.push(questions);
+    const q = Array.isArray(questions) ? questions[0] : questions;
+    if (q.name === 'newName') return { newName: 'empty-interactive-tpl' };
+    if (q.name === 'newDesc') return { newDesc: 'Empty template description' };
+    if (q.name === 'hasMoreVariables') return { hasMoreVariables: false };
+    return {};
+  };
+
+  try {
+    await learn(srcDir, null, {});
+
+    const config = loadConfig();
+    assert.ok(config.templates['empty-interactive-tpl'], 'Template should be saved');
+    assert.deepStrictEqual(config.templates['empty-interactive-tpl'].folders, [], 'Folders list should be empty');
+    assert.deepStrictEqual(config.templates['empty-interactive-tpl'].copy_files, [], 'Copy files list should be empty');
+    
+    const checkboxPrompts = promptCalls.filter(q => q.type === 'checkbox');
+    assert.strictEqual(checkboxPrompts.length, 0, 'No checkbox prompts should be called for empty directory');
+  } finally {
+    inquirer.prompt = originalPrompt;
+    rmrf(srcDir);
+    cleanConfig();
+    rmrf(testHome);
+  }
+});
+
+test('learn in interactive mode handles unchecking all folders without empty checkbox errors', async () => {
+  const srcDir = createSourceDir('.test-learn-uncheck-folders');
+  cleanConfig();
+  
+  fs.mkdirSync(path.join(srcDir, 'folderA'), { recursive: true });
+  fs.mkdirSync(path.join(srcDir, 'folderB'), { recursive: true });
+
+  const originalPrompt = inquirer.prompt;
+  const promptCalls: any[] = [];
+  
+  inquirer.prompt = async (questions: any) => {
+    promptCalls.push(questions);
+    const q = Array.isArray(questions) ? questions[0] : questions;
+    if (q.name === 'newName') return { newName: 'uncheck-folders-tpl' };
+    if (q.name === 'newDesc') return { newDesc: 'Uncheck folders description' };
+    if (q.name === 'hasMoreVariables') return { hasMoreVariables: false };
+    if (q.name === 'selectedFiles') return { selectedFiles: [] };
+    if (q.name === 'selectedStructure') return { selectedStructure: [] };
+    return {};
+  };
+
+  try {
+    await learn(srcDir, null, {});
+
+    const config = loadConfig();
+    assert.ok(config.templates['uncheck-folders-tpl'], 'Template should be saved');
+    assert.deepStrictEqual(config.templates['uncheck-folders-tpl'].folders, [], 'Folders list should be empty');
+    
+    const selectedFoldersPrompt = promptCalls.find(q => q.name === 'selectedFolders');
+    assert.strictEqual(selectedFoldersPrompt, undefined, 'selectedFolders checkbox prompt should not be called');
+  } finally {
+    inquirer.prompt = originalPrompt;
     rmrf(srcDir);
     cleanConfig();
     rmrf(testHome);

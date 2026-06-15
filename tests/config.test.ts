@@ -2,12 +2,16 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 // Force a temporary home directory for testing before importing anything from the CLI
 const testHome = path.join(process.cwd(), '.test-home-config');
-process.env.HOME = testHome;
 
-import { normalizeVariable, saveConfig, loadConfig, PtConfig, CONFIG_PATH } from '../src/config.js';
+// Mock os.homedir() to return the test directory (Node.js doesn't use HOME env var on Linux)
+const originalHomedir = os.homedir;
+os.homedir = () => testHome;
+
+import { normalizeVariable, saveConfig, loadConfig, PtConfig, CONFIG_PATH, HOME_DIR } from '../src/config.js';
 
 test('normalizeVariable key ordering', () => {
   const variableInput = {
@@ -759,5 +763,16 @@ test('saveConfig preserves existing config when not deleting', () => {
   // Restore the original config if it existed
   if (savedConfig) {
     saveConfig(savedConfig);
+  }
+});
+
+// Cleanup: restore original os.homedir function and clean up test directory
+after(() => {
+  // Restore original os.homedir function
+  os.homedir = originalHomedir;
+  
+  // Clean up test home directory if it exists
+  if (fs.existsSync(testHome)) {
+    fs.rmdirSync(testHome, { recursive: true });
   }
 });

@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { loadConfig, getTemplateNames, CONFIG_PATH } from '../config.js';
+import { loadConfig, getTemplateNames, getConfigPath } from '../config.js';
 
 export interface ConfigOptions {
   json?: boolean;
@@ -28,7 +28,7 @@ export function configCommand(templateName: string | undefined, options: ConfigO
   
   const names = getTemplateNames(config);
   
-  console.log(chalk.cyan('Config Location:'), CONFIG_PATH);
+  console.log(chalk.cyan('Config Location:'), getConfigPath());
   console.log(chalk.cyan('\nLearned Templates:'));
   if (names.length === 0) {
     console.log(chalk.gray('  (none)'));

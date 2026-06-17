@@ -4,8 +4,13 @@ import path from 'path';
 import os from 'os';
 import chalk from 'chalk';
 
-export const HOME_DIR = path.join(os.homedir(), '.pt');
-export const CONFIG_PATH = path.join(HOME_DIR, 'config.yaml');
+export function getHomeDir(): string {
+  return path.join(os.homedir(), '.pt');
+}
+
+export function getConfigPath(): string {
+  return path.join(getHomeDir(), 'config.yaml');
+}
 
 export interface FolderNode {
   name: string;
@@ -63,14 +68,14 @@ export interface PtConfig {
 }
 
 export function ensureConfigDir() {
-  if (!fs.existsSync(HOME_DIR)) {
-    fs.mkdirSync(HOME_DIR, { recursive: true });
+  if (!fs.existsSync(getHomeDir())) {
+    fs.mkdirSync(getHomeDir(), { recursive: true });
   }
 }
 
 export function loadConfig(): PtConfig {
   ensureConfigDir();
-  if (!fs.existsSync(CONFIG_PATH)) {
+  if (!fs.existsSync(getConfigPath())) {
     const defaultConfig: PtConfig = {
       version: '3.0',
       templates: {},
@@ -84,7 +89,7 @@ export function loadConfig(): PtConfig {
   }
 
   try {
-    const content = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    const content = fs.readFileSync(getConfigPath(), 'utf-8');
     if (!content.trim()) {
       throw new Error("Config file is empty");
     }
@@ -142,7 +147,7 @@ export function loadConfig(): PtConfig {
     const error = err as Error;
     console.error(chalk.red(`\nError loading config: ${error.message}`));
     // If we have a backup, maybe suggest using it
-    const backupPath = CONFIG_PATH + '.bak';
+    const backupPath = getConfigPath() + '.bak';
     if (fs.existsSync(backupPath)) {
       console.error(chalk.yellow(`A backup exists at ${backupPath}. You may want to restore it.`));
     }
@@ -175,20 +180,20 @@ export function saveConfig(config: PtConfig) {
   }
 
   const content = YAML.stringify(config);
-  const tempPath = CONFIG_PATH + '.tmp';
-  const backupPath = CONFIG_PATH + '.bak';
+  const tempPath = getConfigPath() + '.tmp';
+  const backupPath = getConfigPath() + '.bak';
 
   try {
     // 1. Create a backup of the current valid config if it exists
-    if (fs.existsSync(CONFIG_PATH)) {
-      fs.copyFileSync(CONFIG_PATH, backupPath);
+    if (fs.existsSync(getConfigPath())) {
+      fs.copyFileSync(getConfigPath(), backupPath);
     }
 
     // 2. Write to a temporary file first (atomic save)
     fs.writeFileSync(tempPath, content);
 
     // 3. Rename temp file to actual config path
-    fs.renameSync(tempPath, CONFIG_PATH);
+    fs.renameSync(tempPath, getConfigPath());
   } catch (err) {
     const error = err as Error;
     console.error(chalk.red(`\nFailed to save config: ${error.message}`));

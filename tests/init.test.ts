@@ -8,7 +8,7 @@ const testHome = path.join(process.cwd(), '.test-home-init');
 process.env.HOME = testHome;
 
 import { init } from '../src/commands/initCommand.js';
-import { loadConfig, saveConfig, PtConfig, CONFIG_PATH } from '../src/config.js';
+import { loadConfig, saveConfig, PtConfig, getConfigPath } from '../src/config.js';
 
 // Helper to clean up test directories
 function cleanup(...paths: string[]) {

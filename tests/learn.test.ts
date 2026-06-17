@@ -9,7 +9,7 @@ const testHome = path.join(process.cwd(), '.test-home-learn');
 process.env.HOME = testHome;
 
 import { learn } from '../src/commands/learnCommand.js';
-import { loadConfig, saveConfig, PtConfig, CONFIG_PATH } from '../src/config.js';
+import { loadConfig, saveConfig, PtConfig, getConfigPath } from '../src/config.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,8 +31,8 @@ function rmrf(p: string) {
 
 /** Ensure a clean test config state (no leftover config files). */
 function cleanConfig() {
-  if (fs.existsSync(CONFIG_PATH)) fs.unlinkSync(CONFIG_PATH);
-  const bak = CONFIG_PATH + '.bak';
+  if (fs.existsSync(getConfigPath())) fs.unlinkSync(getConfigPath());
+  const bak = getConfigPath() + '.bak';
   if (fs.existsSync(bak)) fs.unlinkSync(bak);
 }
 

@@ -16,7 +16,7 @@ import {
   shouldExcludeFile,
   sanitizePath,
   DEFAULT_EXCLUDES,
-  HOME_DIR,
+  getHomeDir,
   PtConfig,
 } from '../src/config.js';
 
@@ -31,30 +31,30 @@ after(() => {
 
 test('ensureConfigDir creates dir when it does not exist', () => {
   // Make sure the dir does NOT exist before the test
-  if (fs.existsSync(HOME_DIR)) {
-    fs.rmSync(HOME_DIR, { recursive: true, force: true });
+  if (fs.existsSync(getHomeDir())) {
+    fs.rmSync(getHomeDir(), { recursive: true, force: true });
   }
-  assert.ok(!fs.existsSync(HOME_DIR), 'Precondition: HOME_DIR should not exist');
+  assert.ok(!fs.existsSync(getHomeDir()), 'Precondition: getHomeDir() should not exist');
 
   ensureConfigDir();
 
-  assert.ok(fs.existsSync(HOME_DIR), 'HOME_DIR should be created');
-  assert.ok(fs.statSync(HOME_DIR).isDirectory(), 'HOME_DIR should be a directory');
+  assert.ok(fs.existsSync(getHomeDir()), 'getHomeDir() should be created');
+  assert.ok(fs.statSync(getHomeDir()).isDirectory(), 'getHomeDir() should be a directory');
 });
 
 test('ensureConfigDir does nothing when dir already exists', () => {
   // Ensure directory exists first
-  if (!fs.existsSync(HOME_DIR)) {
-    fs.mkdirSync(HOME_DIR, { recursive: true });
+  if (!fs.existsSync(getHomeDir())) {
+    fs.mkdirSync(getHomeDir(), { recursive: true });
   }
   // Place a marker file inside to prove the dir is not recreated
-  const markerPath = path.join(HOME_DIR, '.marker');
+  const markerPath = path.join(getHomeDir(), '.marker');
   fs.writeFileSync(markerPath, 'exists');
 
   ensureConfigDir();
 
-  assert.ok(fs.existsSync(HOME_DIR), 'HOME_DIR should still exist');
-  assert.ok(fs.existsSync(markerPath), 'Marker file inside HOME_DIR should still exist');
+  assert.ok(fs.existsSync(getHomeDir()), 'getHomeDir() should still exist');
+  assert.ok(fs.existsSync(markerPath), 'Marker file inside getHomeDir() should still exist');
 
   // Clean up marker
   fs.unlinkSync(markerPath);

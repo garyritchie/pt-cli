@@ -1,17 +1,15 @@
-import { test, before, after } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
 
 // Force a temporary home directory for testing before importing anything from the CLI
 const testHome = path.join(process.cwd(), '.test-home-config');
 
-// Mock os.homedir() to return the test directory (Node.js doesn't use HOME env var on Linux)
-const originalHomedir = os.homedir;
-os.homedir = () => testHome;
+// Set HOME environment variable before importing (needed for dynamic getters)
+process.env.HOME = testHome;
 
-import { normalizeVariable, saveConfig, loadConfig, PtConfig, CONFIG_PATH, HOME_DIR } from '../src/config.js';
+import { normalizeVariable, saveConfig, loadConfig, PtConfig, getConfigPath, getHomeDir } from '../src/config.js';
 
 test('normalizeVariable key ordering', () => {
   const variableInput = {
@@ -32,15 +30,15 @@ test('normalizeVariable key ordering', () => {
 test('saveConfig and loadConfig roundtrip', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
@@ -68,11 +66,11 @@ test('saveConfig and loadConfig roundtrip', () => {
   // Save the config
   saveConfig(testConfig);
 
-  // Assert CONFIG_PATH exists and has been created
-  assert.ok(fs.existsSync(CONFIG_PATH), 'Config file should be created');
+  // Assert getConfigPath() exists and has been created
+  assert.ok(fs.existsSync(getConfigPath()), 'Config file should be created');
 
   // Verify key order in YAML string
-  const yamlContent = fs.readFileSync(CONFIG_PATH, 'utf-8');
+  const yamlContent = fs.readFileSync(getConfigPath(), 'utf-8');
   assert.ok(yamlContent.includes('name: myVar'), 'Should contain myVar variable');
   
   // Load the config back
@@ -96,8 +94,8 @@ test('saveConfig and loadConfig roundtrip', () => {
   assert.ok(backupContent.includes("version: 1.0.0") || backupContent.includes("version: '1.0.0'"), 'Backup should contain previous version');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -109,7 +107,7 @@ test('saveConfig and loadConfig roundtrip', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
@@ -148,15 +146,15 @@ test('normalizeVariable with all fields', () => {
 test('saveConfig creates backup on overwrite', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
@@ -172,7 +170,7 @@ test('saveConfig creates backup on overwrite', () => {
 
   // Save first config
   saveConfig(config1);
-  assert.ok(fs.existsSync(CONFIG_PATH), 'Config file should be created');
+  assert.ok(fs.existsSync(getConfigPath()), 'Config file should be created');
 
   // Save second config (should create backup)
   saveConfig(config2);
@@ -183,8 +181,8 @@ test('saveConfig creates backup on overwrite', () => {
   assert.ok(backupContent.includes("version: 1.0.0") || backupContent.includes("version: '1.0.0'"), 'Backup should contain previous version');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -196,22 +194,22 @@ test('saveConfig creates backup on overwrite', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
 test('saveConfig atomic write behavior', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
@@ -225,15 +223,15 @@ test('saveConfig atomic write behavior', () => {
   saveConfig(config);
   
   // Verify config exists
-  assert.ok(fs.existsSync(CONFIG_PATH), 'Config file should be created');
+  assert.ok(fs.existsSync(getConfigPath()), 'Config file should be created');
   
   // Verify no temp file remains
-  const tempPath = CONFIG_PATH + '.tmp';
+  const tempPath = getConfigPath() + '.tmp';
   assert.ok(!fs.existsSync(tempPath), 'Temp file should not remain');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -245,22 +243,22 @@ test('saveConfig atomic write behavior', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
 test('loadConfig returns default config when file missing', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
@@ -275,7 +273,7 @@ test('loadConfig returns default config when file missing', () => {
 
   // Clean up
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
   
   // Restore the original config if it existed
@@ -287,15 +285,15 @@ test('loadConfig returns default config when file missing', () => {
 test('saveConfig with variables normalizes key order', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
@@ -336,8 +334,8 @@ test('saveConfig with variables normalizes key order', () => {
   assert.strictEqual(vars[1].name, 'var2', 'Second variable name should be var2');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -349,28 +347,33 @@ test('saveConfig with variables normalizes key order', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
 test('saveConfig with empty config file', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
 
+  // Ensure the config directory exists
+  if (!fs.existsSync(getHomeDir())) {
+    fs.mkdirSync(getHomeDir(), { recursive: true });
+  }
+
   // Create empty config file
-  fs.writeFileSync(CONFIG_PATH, '');
+  fs.writeFileSync(getConfigPath(), '');
   
   // loadConfig calls process.exit(1) on error, so we need to mock it
   // to prevent the test runner from dying
@@ -394,8 +397,8 @@ test('saveConfig with empty config file', () => {
   }
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -407,7 +410,7 @@ test('saveConfig with empty config file', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
@@ -429,15 +432,15 @@ test('normalizeVariable preserves field order', () => {
 test('saveConfig handles multiple templates', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
@@ -466,8 +469,8 @@ test('saveConfig handles multiple templates', () => {
   assert.strictEqual(loaded.templates['template2'].description, 'Template 2');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -479,22 +482,22 @@ test('saveConfig handles multiple templates', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
 test('saveConfig handles templates with variables', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
   }
@@ -532,8 +535,8 @@ test('saveConfig handles templates with variables', () => {
   assert.strictEqual(template.variables?.[0].required, true, 'Variable should be required');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -545,24 +548,29 @@ test('saveConfig handles templates with variables', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
 test('loadConfig handles migration from v2.0', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
+  }
+
+  // Ensure the config directory exists
+  if (!fs.existsSync(getHomeDir())) {
+    fs.mkdirSync(getHomeDir(), { recursive: true });
   }
 
   // Create a v2.0 config
@@ -577,7 +585,7 @@ test('loadConfig handles migration from v2.0', () => {
     }
   };
 
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(v2Config));
+  fs.writeFileSync(getConfigPath(), JSON.stringify(v2Config));
   
   // Load config - should migrate to v3.0
   const config = loadConfig();
@@ -588,8 +596,8 @@ test('loadConfig handles migration from v2.0', () => {
   assert.ok(!config.templates['test-template'].type, 'Type should be removed');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -601,24 +609,29 @@ test('loadConfig handles migration from v2.0', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
 test('loadConfig handles migration from v2.0 with global_post_config', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
+  }
+
+  // Ensure the config directory exists
+  if (!fs.existsSync(getHomeDir())) {
+    fs.mkdirSync(getHomeDir(), { recursive: true });
   }
 
   // Create a v2.0 config with global_post_config
@@ -633,7 +646,7 @@ test('loadConfig handles migration from v2.0 with global_post_config', () => {
     ]
   };
 
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(v2Config));
+  fs.writeFileSync(getConfigPath(), JSON.stringify(v2Config));
   
   // Load config - should migrate to v3.0
   const config = loadConfig();
@@ -649,8 +662,8 @@ test('loadConfig handles migration from v2.0 with global_post_config', () => {
   assert.ok(!config.global_post_config, 'global_post_config should be removed');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -662,24 +675,29 @@ test('loadConfig handles migration from v2.0 with global_post_config', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
 test('loadConfig handles migration from v2.0 with variables', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
   // Clean up any existing test files
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
-  const backupPath = CONFIG_PATH + '.bak';
+  const backupPath = getConfigPath() + '.bak';
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
+  }
+
+  // Ensure the config directory exists
+  if (!fs.existsSync(getHomeDir())) {
+    fs.mkdirSync(getHomeDir(), { recursive: true });
   }
 
   // Create a v2.0 config with variables as Record<string, string>
@@ -692,7 +710,7 @@ test('loadConfig handles migration from v2.0 with variables', () => {
     }
   };
 
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(v2Config));
+  fs.writeFileSync(getConfigPath(), JSON.stringify(v2Config));
   
   // Load config - should migrate to v3.0
   const config = loadConfig();
@@ -706,8 +724,8 @@ test('loadConfig handles migration from v2.0 with variables', () => {
   assert.strictEqual(config.variables[1].default, 'web', 'Second variable default should be web');
 
   // Clean up
-  if (fs.existsSync(CONFIG_PATH)) {
-    fs.unlinkSync(CONFIG_PATH);
+  if (fs.existsSync(getConfigPath())) {
+    fs.unlinkSync(getConfigPath());
   }
   if (fs.existsSync(backupPath)) {
     fs.unlinkSync(backupPath);
@@ -719,7 +737,7 @@ test('loadConfig handles migration from v2.0 with variables', () => {
   }
   
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome);
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });
 
@@ -737,7 +755,7 @@ test('loadConfig handles existing config file', () => {
 test('saveConfig preserves existing config when not deleting', () => {
   // Save the current config to restore later
   let savedConfig: PtConfig | null = null;
-  if (fs.existsSync(CONFIG_PATH)) {
+  if (fs.existsSync(getConfigPath())) {
     savedConfig = loadConfig();
   }
 
@@ -768,11 +786,8 @@ test('saveConfig preserves existing config when not deleting', () => {
 
 // Cleanup: restore original os.homedir function and clean up test directory
 after(() => {
-  // Restore original os.homedir function
-  os.homedir = originalHomedir;
-  
   // Clean up test home directory if it exists
   if (fs.existsSync(testHome)) {
-    fs.rmdirSync(testHome, { recursive: true });
+    fs.rmSync(testHome, { recursive: true, force: true });
   }
 });

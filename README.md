@@ -119,11 +119,13 @@ pt init ./new-project --file my-template.json --yes
 An official agent skill is included in this repository: [`skills/agency-pt-operator/SKILL.md`](skills/agency-pt-operator/SKILL.md).
 
 Equipping your agent with this skill allows it to automatically use `pt-cli` to lay down standardized boilerplate and capture new architectures you develop together.
+
 ## Warning
 
 **⚠️ Beta Software Warning**: This project is in beta stage. While stable for most use cases, please make regular backups of your template configurations before running updates or major changes.
 
 **💾 Backup Paths**:
+
 - **Linux/macOS**: `~/.pt/` or `/home/username/.pt/` and `/Users/username/.pt/`
 - **Windows**: `%USERPROFILE%\.pt\` (typically `C:\Users\Username\.pt\`)
 

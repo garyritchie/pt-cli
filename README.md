@@ -130,3 +130,7 @@ Equipping your agent with this skill allows it to automatically use `pt-cli` to 
 - **Windows**: `%USERPROFILE%\.pt\` (typically `C:\Users\Username\.pt\`)
 
 Always back up these directories before installing new versions or making significant changes.
+
+## Example Templates
+
+There are a couple of [example templates](https://github.com/search?q=topic%3Atemplate-project+org%3Agaryritchie&type=Repositories) for you to try. These include utilities written in python to help streamline common file management tasks.

@@ -44,3 +44,4 @@ scratch/
 
 .vale.ini
 styles/
+test-*.json

@@ -79,16 +79,24 @@ pt init ./new-project --file my-template.json --yes
 
 ### Round-trip Workflow
 
-The complete portable template workflow:
-1. `pt config my-template --json > .pt-template.json` — export config
-2. Copy `.pt-template.json` into the template source directory
-3. Share the directory (zip, git repo, etc.)
-4. Recipient: `pt learn /path/to/shared-dir --yes` — auto-detects everything
-5. Or scaffold directly without registering: `pt init ./new-project --file .pt-template.json --yes`
+The complete portable template workflow, perfect for sharing:
+
+1. **Create template:** `pt init <template> <dest> --yes --skip-post-config` — creates structure without auto-executing post-config tasks (e.g., `git init`)
+2. **Export config:** `pt config <template> --json > <dest>/.pt-template.json` — exports portable JSON config, required to include variables
+3. **Share directory/JSON:** Share the directory or JSON file
+4. **Recipient:** `pt learn <path> --name <template> --yes` — imports the template
+5. **Or scaffold directly:** `pt init ./new-project --file .pt-template.json --yes`
 
 ### JSON Output for Sharing
 
 You can output a template as JSON for sharing without saving it: `pt learn <source_path> --json`
+
+### Important Notes
+
+- **Never use manual `mkdir`/`cp` steps** — `pt init` already scaffolds directory structures, and manual file copying bypasses template registration
+- **`--skip-post-config` flag** prevents premature task execution during template creation
+- **JSON export captures all template metadata**, variables, and post-config tasks for maximum portability
+- The workflow ensures portability by bundling metadata and files together, allowing recipients to import via `pt learn` without manual directory manipulation
 
 ## Default Post-Config
 

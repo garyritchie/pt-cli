@@ -1,6 +1,6 @@
 # pt - Project Template CLI
 
-A CLI tool to record directory structures as templates and initialize new projects from them.
+A CLI tool to record directory structures as templates and initialize new projects from them. A [GUI](https://garylritchie.gumroad.com/l/pt-gui) is also in development.
 
 ```mermaid
 graph LR
@@ -133,4 +133,4 @@ Always back up these directories before installing new versions or making signif
 
 ## Example Templates
 
-There are a couple of [example templates](https://github.com/search?q=topic%3Atemplate-project+org%3Agaryritchie&type=Repositories) for you to try. These include utilities written in python to help streamline common file management tasks.
+[Example templates](https://github.com/search?q=topic%3Atemplate-project+org%3Agaryritchie&type=Repositories) are available. These include useful python scripts to help streamline common file management tasks.

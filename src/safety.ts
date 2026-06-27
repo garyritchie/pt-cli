@@ -164,35 +164,35 @@ export function isTrustedSource(url: string, trustedSources: string[] = DEFAULT_
 }
 
 /**
- * Check if a command has been executed too many times (rate limiting)
+ * Rate limiting: track the last execution timestamp per command hash
  */
-const executionCounts = new Map<string, number>();
+const lastExecutionTimes = new Map<string, number>();
 const RATE_LIMIT_MS = 1000; // 1 second between identical commands
 
 export function canExecute(command: string, maxCommandsPerRun: number = 50): boolean {
-  // Check total count per run
-  const totalExecuted = Array.from(executionCounts.values()).reduce((sum, count) => sum + count, 0);
+  // Check total commands executed this run
+  const totalExecuted = lastExecutionTimes.size;
   if (totalExecuted >= maxCommandsPerRun) {
     return false;
   }
 
   // Check rate limit for this specific command
   const hash = crypto.createHash('md5').update(command).digest('hex');
-  const last = executionCounts.get(hash) || 0;
-  if (Date.now() - last < RATE_LIMIT_MS) {
+  const lastTime = lastExecutionTimes.get(hash) || 0;
+  if (Date.now() - lastTime < RATE_LIMIT_MS) {
     return false;
   }
 
-  // Update count
-  executionCounts.set(hash, Date.now());
+  // Record execution timestamp
+  lastExecutionTimes.set(hash, Date.now());
   return true;
 }
 
 /**
- * Reset execution counts (for testing or between runs)
+ * Reset execution timestamps (for testing or between runs)
  */
 export function resetExecutionCounts(): void {
-  executionCounts.clear();
+  lastExecutionTimes.clear();
 }
 
 /**
@@ -260,10 +260,10 @@ export function getSecurityPolicy(configPath?: string): SecurityPolicy {
 }
 
 /**
- * Show warning about dangerous command and wait for user to cancel
+ * Show warning about dangerous command and wait for user to cancel.
+ * Resolves true after the timeout (continue), or false immediately on CTRL+C (cancel).
  */
 export async function showDangerousCommandWarning(command: string, timeoutSeconds: number = 5): Promise<boolean> {
-  const inquirer = (await import('inquirer')).default;
   const readline = await import('readline');
 
   console.log(chalk.red('\n⚠️  DANGEROUS COMMAND DETECTED'));
@@ -271,30 +271,23 @@ export async function showDangerousCommandWarning(command: string, timeoutSecond
   console.log(chalk.red('   This could potentially harm your system.'));
   console.log(chalk.yellow(`   Press CTRL+C to cancel, or wait ${timeoutSeconds}s to continue...`));
 
-  // Set up timeout
-  const timeout = setTimeout(() => {
-    return true; // Continue after timeout
-  }, timeoutSeconds * 1000);
-
-  // Set up readline for immediate cancel
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
 
   return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      rl.close();
+      resolve(true);
+    }, timeoutSeconds * 1000);
+
     rl.on('SIGINT', () => {
-      clearTimeout(timeout);
+      clearTimeout(timer);
       rl.close();
       console.log(chalk.yellow('\n⚠️  Command cancelled by user'));
       resolve(false);
     });
-
-    // If timeout expires, resolve without waiting for readline
-    setTimeout(() => {
-      rl.close();
-      resolve(true);
-    }, timeoutSeconds * 1000);
   });
 }
 

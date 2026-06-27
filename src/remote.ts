@@ -9,7 +9,7 @@ import chalk from 'chalk';
 import { isTrustedSource, logSecurityEvent, getSecurityPolicy } from './safety.js';
 import { loadConfig } from './config.js';
 
-export async function downloadAndExtract(url: string, isJsonMode: boolean = false): Promise<string> {
+export async function downloadAndExtract(url: string, isJsonMode: boolean = false, allowUntrusted: boolean = false): Promise<string> {
     // Load security policy
     const configPath = path.join(process.env.HOME || os.homedir(), '.pt', 'config.yaml');
     const config = loadConfig();
@@ -17,19 +17,20 @@ export async function downloadAndExtract(url: string, isJsonMode: boolean = fals
         trustedSources: ['github.com/garyritchie', 'gitea.lyonritchie.com/garyritchie', 'github.com/lyonritchie'],
     };
 
-    // SECURITY CHECK: Verify source is trusted
-    if (!isTrustedSource(url, securityPolicy.trustedSources)) {
+    // SECURITY CHECK: Verify source is trusted (skipped when --allow-untrusted is passed)
+    if (!allowUntrusted && !isTrustedSource(url, securityPolicy.trustedSources)) {
         if (isJsonMode) {
-            // In JSON mode, output warning as JSON for GUI consumption
+            // In JSON mode, output warning as JSON for GUI consumption.
+            // The GUI will show a confirmation dialog and, if the user says YES,
+            // re-run `pt learn <url> --json --yes --allow-untrusted`.
             console.log(JSON.stringify({
                 type: 'security_warning',
+                url: url,
                 message: `Template from untrusted source: ${url}`,
-                warning: 'Only use templates from trusted sources',
+                warning: 'Only use templates from trusted sources.',
                 prompt: 'Continue anyway?',
                 default: false
             }));
-            
-            // Exit immediately - GUI will call security-response command
             process.exit(1);
         } else {
             console.log(chalk.yellow(`⚠️  Warning: Template from untrusted source: ${url}`));

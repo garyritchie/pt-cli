@@ -33,6 +33,7 @@ program
   .option('--name <name>', 'Template name (skip prompt)')
   .option('--desc <description>', 'Template description (skip prompt)')
   .option('--json', 'Output template structure as JSON for sharing instead of saving')
+  .option('--allow-untrusted', 'Bypass the trusted-source check for remote URLs (set by GUI after user confirmation)')
   .action(async (pathArg: string | undefined, options) => {
     await learn(pathArg || '.', null, options);
   });

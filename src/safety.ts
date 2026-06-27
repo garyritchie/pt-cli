@@ -13,8 +13,8 @@ const BLOCKED_COMMANDS = [
   'sudo', 'su', 'su -', 'su root',
   // Disk operations that could destroy data
   'dd', 'mkfs', 'fdisk', 'mount', 'umount',
-  // Shell injection patterns
-  ';', '|', '&', '&&', '||',
+  // Shell injection patterns - removed from blocklist to allow command chaining.
+  // These are validated as warnings instead.
   // Dangerous chmod
   'chmod 777', 'chmod -R 777', 'chmod 666',
   // System commands that could kill processes
@@ -28,8 +28,6 @@ const BLOCKED_COMMANDS = [
 // === DANGEROUS PATTERNS ===
 // Commands that should trigger a warning but are NOT blocked
 const DANGEROUS_PATTERNS = [
-  // Destructive file operations
-  'rm -rf', 'rm -r', 'rm --no-preserve-root', 'rm -rf /',
   // Remote downloads + execution
   'curl', 'wget', 'wget -O', 'curl |', 'wget |',
   // Script execution
@@ -83,6 +81,31 @@ export function isBlockedCommand(command: string): boolean {
  * Check if a command should trigger a warning (but is allowed)
  */
 export function isDangerousCommand(command: string): boolean {
+  // Check for destructive file operations targeting absolute paths
+  // Regex matches 'rm', 'rmdir', or Windows 'del' followed by optional flags and then an absolute path.
+  // Absolute path matches:
+  // - Unix: starting with '/' (e.g. /tmp, /usr)
+  // - Windows: starting with drive letter (e.g. C:\) or UNC path (\\) or drive-relative '\'
+  const parts = command.split(/\s+/);
+  const rmIndex = parts.findIndex(p => p === 'rm' || p === 'rmdir' || p === 'del');
+  if (rmIndex !== -1) {
+    // Check subsequent arguments
+    for (let i = rmIndex + 1; i < parts.length; i++) {
+      const arg = parts[i];
+      if (!arg) continue;
+      // Skip flags (starting with - or /flag on Windows)
+      if (arg.startsWith('-') || (process.platform === 'win32' && arg.startsWith('/'))) {
+        continue;
+      }
+      // Check absolute path patterns
+      const isAbsolute = arg.startsWith('/') || 
+                         (process.platform === 'win32' && (/^[a-zA-Z]:\\/.test(arg) || arg.startsWith('\\\\') || arg.startsWith('\\')));
+      if (isAbsolute) {
+        return true;
+      }
+    }
+  }
+
   for (const pattern of DANGEROUS_PATTERNS) {
     if (command.includes(pattern)) {
       return true;

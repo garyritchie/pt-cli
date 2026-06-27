@@ -210,7 +210,40 @@ export async function init(targetName: string | undefined, destPath: string | un
   // Use template post_config tasks
   const allTasks = template.post_config?.filter(t => !t.type || t.type === typeName!) || [];
 
-  if (allTasks.length > 0) {
+  if (allTasks.length > 0 && !options.skipPostConfig) {
+    // SECURITY CHECK: Validate template safety before running post_config tasks
+    const { validateTemplateSecurity } = await import('../safety.js');
+    const { valid, errors, warnings } = validateTemplateSecurity(template);
+    
+    if (!valid) {
+      console.error(chalk.red("\n❌ SECURITY ERROR: Aborting post_config execution due to blocked commands:"));
+      for (const err of errors) {
+        console.error(chalk.red(`   - ${err}`));
+      }
+      process.exit(1);
+    }
+
+    if (warnings.length > 0) {
+      console.warn(chalk.yellow("\n⚠️  SECURITY WARNING: Post-config contains dangerous or suspicious commands:"));
+      for (const warn of warnings) {
+        console.warn(chalk.yellow(`   - ${warn}`));
+      }
+      
+      if (!options.yes) {
+        const { proceed } = await inquirer.prompt({
+          type: 'confirm',
+          name: 'proceed',
+          message: chalk.red('Are you sure you want to run these post-config tasks?'),
+          default: false
+        });
+        if (!proceed) {
+          console.log(chalk.yellow("Post-config tasks aborted by user."));
+          return;
+        }
+      } else {
+        console.warn(chalk.yellow("Proceeding anyway (non-interactive mode with auto-confirm enabled)."));
+      }
+    }
     // Determine which tasks to include
     let selectedTaskNames: string[] = [];
     

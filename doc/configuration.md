@@ -8,6 +8,10 @@ Config is stored at `~/.pt/config.yaml` and contains:
 - `ignore`: Global folder ignore patterns for `pt learn`
 - `variables`: Global variable suggestions for `pt learn` (name, prompt, default, required)
 
+## Security Policy
+
+Please see [[security]].
+
 ## Template Variables
 
 When learning a template, you can define variables that will be prompted during initialization:
@@ -51,6 +55,13 @@ If the directory contains a `.pt-template.json` or `template.json` file with a `
 1. Use `pt learn` to capture the basic structure and key boilerplate.
 2. Manually edit `~/.pt/config.yaml` to refine `copy_files`, `post_config` commands, or add specific `chmod` requirements.
 3. Alternatively, initialize a temporary project from your learned template (`pt init`), refine it manually, and then use `pt update` from that directory to "re-learn" the refined state.
+
+**Security Note:** All post-config commands are subject to security validation:
+- Dangerous commands (e.g., `curl`, `python`, `chmod`) trigger warnings with 5-second cancellation
+- Absolute blocks (e.g., `sudo`, `rm -rf`, `dd`) are never allowed
+- Rate limiting prevents runaway execution (50 commands per run)
+- Execution timeout (30 seconds) prevents hung processes
+- All events are logged to `~/.pt/security-audit.log`
 
 ```
 javascript:  [git init, npm install]

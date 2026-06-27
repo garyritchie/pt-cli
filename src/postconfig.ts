@@ -8,10 +8,10 @@ import { PostConfigTask } from './config.js';
 import {
   isBlockedCommand,
   isDangerousCommand,
-  isCommandAllowed,
   executeWithTimeout,
   logSecurityEvent,
   canExecute,
+  showDangerousCommandWarning,
   getSecurityPolicy,
 } from './safety.js';
 
@@ -74,48 +74,40 @@ export async function runPostConfig(
     const progress = `[${i + 1}/${applicableTasks.length}]`;
 
     if (task.command) {
-      // SECURITY CHECK 1: Blocklist check
+      // SECURITY CHECK 1: Blocklist check (NEVER allow these)
       if (isBlockedCommand(task.command)) {
         console.log(chalk.red(`${progress} ⚠️  BLOCKED: ${task.command}`));
         logSecurityEvent('command_blocked', task.command, projectType, 'blocked');
         continue;
       }
 
-      // SECURITY CHECK 2: Allowlist check (strict mode)
-      if (!isCommandAllowed(task.command, securityPolicy.securityLevel)) {
-        console.log(chalk.red(`${progress} ⚠️  NOT ALLOWED: ${task.command}`));
-        logSecurityEvent('command_blocked', task.command, projectType, 'blocked');
-        continue;
-      }
-
-      // SECURITY CHECK 3: Dangerous command confirmation
-      if (isDangerousCommand(task.command) && securityPolicy.requireConfirmationForDangerous) {
-        const response = await inquirer.prompt({
-          type: 'confirm',
-          name: 'run',
-          message: chalk.red(`⚠️  DANGEROUS COMMAND: ${task.command}\nAre you absolutely sure?`),
-          default: false
-        });
-        if (!response.run) {
-          console.log(chalk.yellow(`${progress} ⊘ Command skipped`));
+      // SECURITY CHECK 2: Dangerous command warning (but allow execution)
+      if (isDangerousCommand(task.command)) {
+        console.log(chalk.yellow(`${progress} ⚠️  WARNING: This command may be dangerous: ${task.command}`));
+        console.log(chalk.yellow(`   Press CTRL+C to cancel, or wait 5s to continue...`));
+        
+        // Wait for user to cancel or timeout
+        const allowContinue = await showDangerousCommandWarning(task.command, 5);
+        if (!allowContinue) {
+          console.log(chalk.yellow(`${progress} ⊘ Command cancelled by user`));
           logSecurityEvent('command_blocked', task.command, projectType, 'blocked');
           continue;
         }
       }
 
+      // SECURITY CHECK 3: Rate limiting
+      if (!canExecute(task.command, securityPolicy.maxCommandsPerRun)) {
+        console.log(chalk.red(`${progress} ⚠️  Rate limited: too many commands executed`));
+        continue;
+      }
+
       if (options.dryRun) {
         console.log(chalk.gray(`  [DRY RUN] Would run: ${task.command}`));
       } else {
-        // SECURITY CHECK 4: Rate limiting
-        if (!canExecute(task.command, securityPolicy.maxCommandsPerRun)) {
-          console.log(chalk.red(`${progress} ⚠️  Rate limited: too many commands executed`));
-          continue;
-        }
-
         try {
           console.log(chalk.yellow(`\n${progress} Running: ${task.command}`));
           
-          // SECURITY CHECK 5: Execution timeout
+          // SECURITY CHECK 4: Execution timeout
           const result = await executeWithTimeout(
             task.command,
             destPath,

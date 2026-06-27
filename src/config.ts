@@ -228,36 +228,7 @@ export function getDefaultPostConfig(config: PtConfig): PostConfigTask[] {
  */
 export function getSecurityPolicy(config: PtConfig): SecurityPolicy {
   const defaultPolicy: SecurityPolicy = {
-    allowlist: [
-      'npm', 'npm run', 'yarn', 'yarn run', 'pnpm',
-      'git', 'git add', 'git commit', 'git pull', 'git fetch',
-      'pip', 'pip install', 'python', 'python3',
-      'bash', 'sh', 'node',
-      'chmod', 'chown', 'mkdir', 'cp', 'mv',
-      'sqlite3', 'mysql', 'psql',
-    ],
-    blocklist: [
-      'rm -rf', 'rm -r', 'rm --no-preserve-root',
-      'curl', 'wget', 'wget -O',
-      'bash', 'sh', 'python', 'python3',
-      'eval', 'exec', 'source',
-      'sudo', 'su',
-      'dd', 'mkfs', 'fdisk',
-      'chmod 777', 'chmod -R',
-    ],
-    dangerousPatterns: [
-      'rm -rf', 'rm -r', 'rm --no-preserve-root',
-      'curl', 'wget', 'wget -O',
-      'bash', 'sh', 'python', 'python3',
-      'eval', 'exec', 'source',
-      'sudo', 'su',
-      'dd', 'mkfs', 'fdisk',
-      'chmod 777', 'chmod -R',
-      'curl |', 'wget |',
-      'node -e', 'node -p',
-    ],
     maxExecutionTime: 30000, // 30 seconds
-    requireConfirmationForDangerous: true,
     enableAuditLogging: true,
     trustedSources: [
       'github.com/garyritchie',
@@ -265,8 +236,7 @@ export function getSecurityPolicy(config: PtConfig): SecurityPolicy {
       'github.com/lyonritchie',
     ],
     maxCommandsPerRun: 50,
-    requireSandbox: false,
-    securityLevel: 'strict',
+    securityLevel: 'warn',
   };
 
   return config.security || defaultPolicy;

@@ -1,66 +1,24 @@
 // pt-cli/src/safety.ts
-// Security validation for post_config command execution
+// Security warnings and safeguards for post_config command execution
 import crypto from 'crypto';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
-
-// === ALLOWLIST ===
-// Safe commands that are allowed by default (no confirmation needed)
-const ALLOWED_COMMANDS = [
-  // Build tools
-  'npm', 'npm run', 'yarn', 'yarn run', 'pnpm',
-  // Version control
-  'git', 'git add', 'git commit', 'git pull', 'git fetch',
-  // Package managers
-  'pip', 'pip install', 'python', 'python3',
-  // Script runners
-  'bash', 'sh', 'node',
-  // Common utilities
-  'chmod', 'chown', 'mkdir', 'cp', 'mv',
-  // Database
-  'sqlite3', 'mysql', 'psql',
-  // File operations
-  'cat', 'echo', 'touch', 'ln', 'rm', 'rmdir',
-  // Text processing
-  'sed', 'awk', 'grep', 'find', 'xargs',
-  // Networking (read-only)
-  'curl', 'wget',
-  // Environment
-  'env', 'export', 'source',
-  // Package managers (additional)
-  'apt', 'apt-get', 'yum', 'brew', 'pacman',
-  // Python tools
-  'pip3', 'pipenv', 'poetry', 'virtualenv',
-  // Node tools
-  'npx', 'tsc', 'webpack', 'rollup', 'esbuild',
-  // Python scripting
-  'python3 -m', 'python -m',
-  // Shell scripting
-  'chmod +x', 'chmod 755', 'chmod 644',
-];
+import chalk from 'chalk';
 
 // === BLOCKLIST ===
-// Commands that are NEVER allowed, even with confirmation
+// Commands that are NEVER allowed (safety-critical operations)
 const BLOCKED_COMMANDS = [
-  // Destructive operations
-  'rm -rf', 'rm -r', 'rm --no-preserve-root', 'rm -rf /',
   // Privilege escalation
   'sudo', 'su', 'su -', 'su root',
-  // Dangerous shell operations
-  'eval', 'exec', 'source',
-  // Disk operations
+  // Disk operations that could destroy data
   'dd', 'mkfs', 'fdisk', 'mount', 'umount',
-  // Network download + execute
-  'curl | bash', 'curl | sh', 'wget | bash', 'wget | sh',
   // Shell injection patterns
   ';', '|', '&', '&&', '||',
   // Dangerous chmod
   'chmod 777', 'chmod -R 777', 'chmod 666',
-  // System commands
+  // System commands that could kill processes
   'kill', 'killall', 'pkill', 'fuser',
-  // File system manipulation
-  'chmod -R', 'chown -R', 'chgrp -R',
   // Network operations that could exfiltrate data
   'nc', 'netcat', 'socat',
   // Package manager with dangerous flags
@@ -68,53 +26,49 @@ const BLOCKED_COMMANDS = [
 ];
 
 // === DANGEROUS PATTERNS ===
-// Commands that require user confirmation before execution
+// Commands that should trigger a warning but are NOT blocked
 const DANGEROUS_PATTERNS = [
-  'rm -rf', 'rm -r', 'rm --no-preserve-root',
-  'curl', 'wget', 'wget -O',
-  'bash', 'sh', 'python', 'python3',
+  // Destructive file operations
+  'rm -rf', 'rm -r', 'rm --no-preserve-root', 'rm -rf /',
+  // Remote downloads + execution
+  'curl', 'wget', 'wget -O', 'curl |', 'wget |',
+  // Script execution
+  'bash', 'sh', 'python', 'python3', 'node -e', 'node -p',
+  // Shell operations
   'eval', 'exec', 'source',
-  'sudo', 'su',
-  'dd', 'mkfs', 'fdisk',
-  'chmod 777', 'chmod -R',
-  'curl |', 'wget |',
-  'node -e', 'node -p',
+  // File system manipulation
+  'chmod -R', 'chown -R', 'chgrp -R',
+  // PowerShell (Windows)
+  'powershell', 'pwsh', 'Invoke-Expression', 'IEX',
+  // macOS-specific
+  'diskutil', 'hdiutil', 'csrutil',
 ];
 
 // === DEFAULT CONFIGURATION ===
 export interface SecurityPolicy {
-  allowlist: string[];
-  blocklist: string[];
-  dangerousPatterns: string[];
   maxExecutionTime: number; // milliseconds
-  requireConfirmationForDangerous: boolean;
   enableAuditLogging: boolean;
   trustedSources: string[];
   maxCommandsPerRun: number;
-  requireSandbox: boolean;
-  securityLevel: 'strict' | 'medium' | 'relaxed';
+  securityLevel: 'warn' | 'strict';
 }
 
-// Default security policy
+// Default security policy - warning focused
 const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
-  allowlist: [...ALLOWED_COMMANDS],
-  blocklist: [...BLOCKED_COMMANDS],
-  dangerousPatterns: [...DANGEROUS_PATTERNS],
   maxExecutionTime: 30000, // 30 seconds
-  requireConfirmationForDangerous: true,
   enableAuditLogging: true,
   trustedSources: [
     'github.com/garyritchie',
-    'gitea.lyonritchie.com/garyritchie',
+    'git.lyonritchie.com',
     'github.com/lyonritchie',
   ],
   maxCommandsPerRun: 50,
-  requireSandbox: false,
-  securityLevel: 'strict',
+  securityLevel: 'warn', // Warning-focused mode
 };
 
 /**
  * Check if a command is in the blocklist (NEVER allowed)
+ * Only truly dangerous operations that could destroy data
  */
 export function isBlockedCommand(command: string): boolean {
   for (const blocked of BLOCKED_COMMANDS) {
@@ -126,7 +80,7 @@ export function isBlockedCommand(command: string): boolean {
 }
 
 /**
- * Check if a command requires user confirmation (dangerous but not blocked)
+ * Check if a command should trigger a warning (but is allowed)
  */
 export function isDangerousCommand(command: string): boolean {
   for (const pattern of DANGEROUS_PATTERNS) {
@@ -135,52 +89,6 @@ export function isDangerousCommand(command: string): boolean {
     }
   }
   return false;
-}
-
-/**
- * Check if a command is in the allowlist (allowed without confirmation)
- */
-export function isAllowedCommand(command: string): boolean {
-  const baseCmd = command.split(' ')[0].trim();
-  return ALLOWED_COMMANDS.some(allowed =>
-    baseCmd === allowed || baseCmd.startsWith(allowed + ' ')
-  );
-}
-
-/**
- * Check if a command is safe to execute (not blocked and not dangerous)
- */
-export function isSafeCommand(command: string): boolean {
-  if (isBlockedCommand(command)) {
-    return false;
-  }
-  if (isDangerousCommand(command)) {
-    return false;
-  }
-  return true;
-}
-
-/**
- * Check if a command is allowed based on security policy
- */
-export function isCommandAllowed(command: string, securityLevel: string = 'strict'): boolean {
-  // Blocklist always wins
-  if (isBlockedCommand(command)) {
-    return false;
-  }
-
-  // In strict mode, only allowlist commands are permitted
-  if (securityLevel === 'strict') {
-    return isAllowedCommand(command);
-  }
-
-  // In medium mode, allowlist + dangerous with confirmation
-  if (securityLevel === 'medium') {
-    return isAllowedCommand(command) || isDangerousCommand(command);
-  }
-
-  // In relaxed mode, only blocklist is enforced
-  return !isBlockedCommand(command);
 }
 
 /**
@@ -349,4 +257,43 @@ export function getSecurityPolicy(configPath?: string): SecurityPolicy {
   }
 
   return DEFAULT_SECURITY_POLICY;
+}
+
+/**
+ * Show warning about dangerous command and wait for user to cancel
+ */
+export async function showDangerousCommandWarning(command: string, timeoutSeconds: number = 5): Promise<boolean> {
+  const inquirer = (await import('inquirer')).default;
+  const readline = await import('readline');
+
+  console.log(chalk.red('\n⚠️  DANGEROUS COMMAND DETECTED'));
+  console.log(chalk.red(`   Command: ${command}`));
+  console.log(chalk.red('   This could potentially harm your system.'));
+  console.log(chalk.yellow(`   Press CTRL+C to cancel, or wait ${timeoutSeconds}s to continue...`));
+
+  // Set up timeout
+  const timeout = setTimeout(() => {
+    return true; // Continue after timeout
+  }, timeoutSeconds * 1000);
+
+  // Set up readline for immediate cancel
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.on('SIGINT', () => {
+      clearTimeout(timeout);
+      rl.close();
+      console.log(chalk.yellow('\n⚠️  Command cancelled by user'));
+      resolve(false);
+    });
+
+    // If timeout expires, resolve without waiting for readline
+    setTimeout(() => {
+      rl.close();
+      resolve(true);
+    }, timeoutSeconds * 1000);
+  });
 }

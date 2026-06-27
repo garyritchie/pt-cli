@@ -20,7 +20,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   // Phase 1: Remote Check
   if (sourcePath.startsWith('http')) {
     console.log(chalk.cyan(`Downloading remote template from: ${sourcePath}...`));
-    resolvedPath = await downloadAndExtract(sourcePath);
+    resolvedPath = await downloadAndExtract(sourcePath, options.json || false);
   } else {
     resolvedPath = path.resolve(sourcePath);
   }

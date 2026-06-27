@@ -9,7 +9,7 @@ import chalk from 'chalk';
 import { isTrustedSource, logSecurityEvent, getSecurityPolicy } from './safety.js';
 import { loadConfig } from './config.js';
 
-export async function downloadAndExtract(url: string): Promise<string> {
+export async function downloadAndExtract(url: string, isJsonMode: boolean = false): Promise<string> {
     // Load security policy
     const configPath = path.join(process.env.HOME || os.homedir(), '.pt', 'config.yaml');
     const config = loadConfig();
@@ -19,19 +19,33 @@ export async function downloadAndExtract(url: string): Promise<string> {
 
     // SECURITY CHECK: Verify source is trusted
     if (!isTrustedSource(url, securityPolicy.trustedSources)) {
-        console.log(chalk.yellow(`⚠️  Warning: Template from untrusted source: ${url}`));
-        console.log(chalk.yellow('   Only use templates from trusted sources'));
-        
-        const inquirer = (await import('inquirer')).default;
-        const response = await inquirer.prompt({
-            type: 'confirm',
-            name: 'proceed',
-            message: chalk.red('Continue anyway?'),
-            default: false
-        });
-        
-        if (!response.proceed) {
-            throw new Error('Download cancelled by user due to untrusted source');
+        if (isJsonMode) {
+            // In JSON mode, output warning as JSON for GUI consumption
+            console.log(JSON.stringify({
+                type: 'security_warning',
+                message: `Template from untrusted source: ${url}`,
+                warning: 'Only use templates from trusted sources',
+                prompt: 'Continue anyway?',
+                default: false
+            }));
+            
+            // Exit immediately - GUI will call security-response command
+            process.exit(1);
+        } else {
+            console.log(chalk.yellow(`⚠️  Warning: Template from untrusted source: ${url}`));
+            console.log(chalk.yellow('   Only use templates from trusted sources'));
+            
+            const inquirer = (await import('inquirer')).default;
+            const response = await inquirer.prompt({
+                type: 'confirm',
+                name: 'proceed',
+                message: chalk.red('Continue anyway?'),
+                default: false
+            });
+            
+            if (!response.proceed) {
+                throw new Error('Download cancelled by user due to untrusted source');
+            }
         }
     }
 

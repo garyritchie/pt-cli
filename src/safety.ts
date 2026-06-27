@@ -297,3 +297,19 @@ export async function showDangerousCommandWarning(command: string, timeoutSecond
     }, timeoutSeconds * 1000);
   });
 }
+
+// Security response handling for GUI integration
+export async function handleSecurityResponse(response: string): Promise<boolean> {
+  // Normalize response
+  const normalized = response.trim().toLowerCase();
+  
+  // Accept 'y' or 'yes' as positive response
+  if (normalized === 'y' || normalized === 'yes') {
+    console.log('Security response: ALLOWED');
+    return true;
+  }
+  
+  // Reject any other response
+  console.log('Security response: DENIED');
+  return false;
+}

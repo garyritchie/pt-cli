@@ -14,6 +14,7 @@ import { variablesCommand } from './commands/variablesCommand.js';
 import { addCommand } from './commands/addCommand.js';
 import { removeCommand } from './commands/removeCommand.js';
 import { defaultPostConfigCommand } from './commands/defaultPostConfigCommand.js';
+import { securityResponseCommand } from './commands/securityResponseCommand.js';
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -97,5 +98,12 @@ program
   .description('Remove a learned template from the config')
   .option('-y, --yes', 'Automatically confirm removal')
   .action(removeCommand);
+
+program
+  .command('security-response <response>')
+  .description('Handle security response from GUI')
+  .action(async (response: string) => {
+    await securityResponseCommand(response);
+  });
 
 program.parse(process.argv);

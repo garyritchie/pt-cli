@@ -1,6 +1,6 @@
 {
   "name": "@garyr/pt-cli",
-  "version": "0.32.2",
+  "version": "0.33.0",
   "description": "Project Template CLI - Learn structures and initialize projects",
   "main": "dist/index.js",
   "bin": {

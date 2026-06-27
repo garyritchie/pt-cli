@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import chalk from 'chalk';
+import { SecurityPolicy } from './safety.js';
 
 export function getHomeDir(): string {
   return path.join(os.homedir(), '.pt');
@@ -65,6 +66,7 @@ export interface PtConfig {
   ignore?: string[];  // top-level folder ignore patterns for pt learn
   default_post_config?: PostConfigTask[];  // default post-config tasks applied to all projects
   variables?: TemplateVariable[];         // global variables for substitution
+  security?: SecurityPolicy;  // security policy configuration
 }
 
 export function ensureConfigDir() {
@@ -219,6 +221,55 @@ export function getDefaultPostConfig(config: PtConfig): PostConfigTask[] {
     ...t,
     checked: t.checked !== false // default to true if not explicitly false
   }));
+}
+
+/**
+ * Get security policy from config or use defaults
+ */
+export function getSecurityPolicy(config: PtConfig): SecurityPolicy {
+  const defaultPolicy: SecurityPolicy = {
+    allowlist: [
+      'npm', 'npm run', 'yarn', 'yarn run', 'pnpm',
+      'git', 'git add', 'git commit', 'git pull', 'git fetch',
+      'pip', 'pip install', 'python', 'python3',
+      'bash', 'sh', 'node',
+      'chmod', 'chown', 'mkdir', 'cp', 'mv',
+      'sqlite3', 'mysql', 'psql',
+    ],
+    blocklist: [
+      'rm -rf', 'rm -r', 'rm --no-preserve-root',
+      'curl', 'wget', 'wget -O',
+      'bash', 'sh', 'python', 'python3',
+      'eval', 'exec', 'source',
+      'sudo', 'su',
+      'dd', 'mkfs', 'fdisk',
+      'chmod 777', 'chmod -R',
+    ],
+    dangerousPatterns: [
+      'rm -rf', 'rm -r', 'rm --no-preserve-root',
+      'curl', 'wget', 'wget -O',
+      'bash', 'sh', 'python', 'python3',
+      'eval', 'exec', 'source',
+      'sudo', 'su',
+      'dd', 'mkfs', 'fdisk',
+      'chmod 777', 'chmod -R',
+      'curl |', 'wget |',
+      'node -e', 'node -p',
+    ],
+    maxExecutionTime: 30000, // 30 seconds
+    requireConfirmationForDangerous: true,
+    enableAuditLogging: true,
+    trustedSources: [
+      'github.com/garyritchie',
+      'gitea.lyonritchie.com/garyritchie',
+      'github.com/lyonritchie',
+    ],
+    maxCommandsPerRun: 50,
+    requireSandbox: false,
+    securityLevel: 'strict',
+  };
+
+  return config.security || defaultPolicy;
 }
 
 // Default exclusions for template scanning

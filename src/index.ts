@@ -35,7 +35,19 @@ program
   .option('--json', 'Output template structure as JSON for sharing instead of saving')
   .option('--allow-untrusted', 'Bypass the trusted-source check for remote URLs (set by GUI after user confirmation)')
   .action(async (pathArg: string | undefined, options) => {
-    await learn(pathArg || '.', null, options);
+    try {
+      await learn(pathArg || '.', null, options);
+    } catch (err: any) {
+      if (options.json) {
+        console.log(JSON.stringify({
+          type: 'error',
+          message: err.message || String(err)
+        }));
+      } else {
+        console.error(chalk.red(`Error: ${err.message || err}`));
+      }
+      process.exit(1);
+    }
   });
 
 program
@@ -45,7 +57,12 @@ program
   .option('-y, --yes', 'Automatically confirm prompts')
   .option('--desc <description>', 'Template description (skip prompt)')
   .action(async (templateName: string, sourcePath: string | undefined, options) => {
-    await learn(sourcePath || '.', templateName, options);
+    try {
+      await learn(sourcePath || '.', templateName, options);
+    } catch (err: any) {
+      console.error(chalk.red(`Error: ${err.message || err}`));
+      process.exit(1);
+    }
   });
 
 program

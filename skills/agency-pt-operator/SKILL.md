@@ -136,6 +136,56 @@ Global variables are defined in `~/.pt/config.yaml` under `variables`. They act 
 - Atomic saves, backups, and safe initialization logic prevent data loss.
 - Platform-specific post-config scripts (`.sh`/`.bat`) are executed automatically based on the OS.
 
+## Security Configuration
+
+### Security Policy Settings
+
+Security settings are configured in `~/.pt/config.yaml` under the `security` key:
+
+```yaml
+security:
+  securityLevel: "warn"  # "warn" (default) or "strict"
+  trustedSources:
+    - "github.com/garyritchie"
+    - "git.lyonritchie.com"
+    - "github.com/lyonritchie"
+  maxExecutionTime: 30000  # 30 seconds per command
+  maxCommandsPerRun: 50    # rate limit per init session
+  enableAuditLogging: true # write events to security-audit.log
+```
+
+### Security Levels
+
+- **`warn`** (default): Warning-based approach with cancellation prompts
+- **`strict`**: More conservative defaults, enabled by default for new installations
+
+### Trusted Sources
+
+When downloading templates from remote URLs, `pt-cli` verifies the source against the `trustedSources` list. Untrusted sources trigger a warning and require explicit user confirmation before proceeding.
+
+### Command Security
+
+- **Absolute blocks**: Commands like `sudo`, `rm -rf`, `dd` are always blocked
+- **Dangerous commands**: Commands like `curl`, `python`, `chmod` trigger warnings
+- **Rate limiting**: 50 commands per run prevents runaway execution
+- **Execution timeout**: 30 seconds per command prevents hung processes
+
+### Audit Logging
+
+All security events are logged to `~/.pt/security-audit.log` for monitoring and troubleshooting.
+
+## Security Testing
+
+Security features can be tested by:
+
+1. **Testing command blocks**: Try running templates with dangerous commands like `sudo rm -rf` or `dd`
+2. **Testing remote downloads**: Use untrusted URLs to verify source verification
+3. **Testing rate limiting**: Execute more than 50 commands in a single init session
+4. **Testing timeouts**: Run commands that hang to verify timeout behavior
+5. **Reviewing audit logs**: Check `~/.pt/security-audit.log` for security events
+
+For more details, see the [Security Guide](security.md).
+
 ## CLI Reference
 
 | Command | Description |

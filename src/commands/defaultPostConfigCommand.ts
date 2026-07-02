@@ -27,6 +27,7 @@ export function defaultPostConfigCommand(options: DefaultPostConfigOptions = {})
 
     console.error('You must provide --json <data> to set the default post-config array.');
   } else {
-    console.log('Current default post-config tasks:', config.default_post_config || []);
+    const tasks = config.default_post_config || [];
+    console.log(JSON.stringify(tasks, null, 2));
   }
 }

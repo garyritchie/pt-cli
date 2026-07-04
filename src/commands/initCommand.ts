@@ -172,26 +172,29 @@ export async function init(targetName: string | undefined, destPath: string | un
       if (fs.existsSync(srcPath)) {
         if (options.dryRun) {
           console.log(chalk.gray(`  [DRY RUN] Would copy ${file.src} → ${file.dest || file.src}`));
-          const ext = path.extname(file.src);
-          if (['.sh', '.py', '.bash', '.bat'].includes(ext)) {
-            console.log(chalk.gray(`  [DRY RUN] Would chmod +x ${file.dest || file.src}`));
-          }
+          console.log(chalk.gray(`  [DRY RUN] Would chmod +x ${file.dest || file.src}`));
           continue;
         }
 
-        const fileContent = fs.readFileSync(srcPath, 'utf-8');
+        let fileContent = fs.readFileSync(srcPath, 'utf-8');
+
+        // Substitute variables in post_copy files if template has variables
+        if (template.variables && template.variables.length > 0) {
+          const { substituteVariables } = await import('../substitute.js');
+          fileContent = substituteVariables(fileContent, variables);
+        }
+
         const destDir = path.dirname(destPath);
         fs.mkdirSync(destDir, { recursive: true });
         fs.writeFileSync(destPath, fileContent);
 
-        // Auto-chmod for executables
-        const ext = path.extname(file.src);
-        if (['.sh', '.py', '.bash', '.bat'].includes(ext)) {
-          try {
-            fs.chmodSync(destPath, 0o755);
-          } catch (e) {
-            // chmod not available (Windows)
-          }
+        // post_copy files are executables by definition — always chmod
+        try {
+          // Check if source had execute permissions, otherwise default to 0o755
+          const srcStat = fs.statSync(srcPath);
+          fs.chmodSync(destPath, srcStat.mode & 0o111 ? srcStat.mode : 0o755);
+        } catch (e) {
+          // chmod not available (Windows)
         }
         console.log(chalk.green("  ✓ " + (file.dest || file.src)));
       } else {

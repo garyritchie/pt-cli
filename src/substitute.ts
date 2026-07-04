@@ -44,14 +44,26 @@ export async function processCopyFiles(
       if (dryRun) {
         console.log(chalk.gray(`  [DRY RUN] Would recursively copy directory ${copyFile.src} → ${copyFile.dest}`));
       } else {
-        copyDirRecursive(srcPath, destPath, variables, copyFile.substitute_variables || false, copyFile.chmod);
+        const dirSubstitute = !!(copyFile.substitute_variables === true || (
+          copyFile.substitute_variables === undefined &&
+          template.variables &&
+          template.variables.length > 0 &&
+          Object.keys(variables).length > 0
+        ));
+        copyDirRecursive(srcPath, destPath, variables, dirSubstitute, copyFile.chmod);
       }
       console.log(chalk.green(`  ✓ ${copyFile.dest} (recursive)`));
     } else {
       // Single file copy
       if (dryRun) {
         console.log(chalk.gray(`  [DRY RUN] Would copy ${copyFile.src} → ${copyFile.dest}`));
-        if (copyFile.substitute_variables) {
+        const drySubstitute = !!(copyFile.substitute_variables === true || (
+          copyFile.substitute_variables === undefined &&
+          template.variables &&
+          template.variables.length > 0 &&
+          Object.keys(variables).length > 0
+        ));
+        if (drySubstitute) {
           console.log(chalk.gray(`  [DRY RUN] Would substitute variables in ${copyFile.dest}`));
         }
         if (copyFile.chmod) {
@@ -64,7 +76,15 @@ export async function processCopyFiles(
       fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
       let content = fs.readFileSync(srcPath, 'utf-8');
-      if (copyFile.substitute_variables) {
+      // Default to substituting if substitute_variables is true, OR if it's undefined AND the template defines variables.
+      // If substitute_variables is explicitly false, do not substitute.
+      const shouldSubstitute = !!(copyFile.substitute_variables === true || (
+        copyFile.substitute_variables === undefined &&
+        template.variables &&
+        template.variables.length > 0 &&
+        Object.keys(variables).length > 0
+      ));
+      if (shouldSubstitute) {
         content = substituteVariables(content, variables);
       }
 

@@ -21,7 +21,15 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   // Phase 1: Remote Check
   if (sourcePath.startsWith('http')) {
     console.log(chalk.cyan(`Downloading remote template from: ${sourcePath}...`));
-    resolvedPath = await downloadAndExtract(sourcePath, options.json || false, options.allowUntrusted || false);
+    try {
+      resolvedPath = await downloadAndExtract(sourcePath, options.json || false, options.allowUntrusted || false);
+    } catch (err) {
+      if ((err as Error).message === 'Download cancelled by user due to untrusted source') {
+        console.log(chalk.yellow('Download cancelled. Exiting.'));
+        process.exit(0);
+      }
+      throw err;
+    }
   } else {
     resolvedPath = path.resolve(sourcePath);
   }

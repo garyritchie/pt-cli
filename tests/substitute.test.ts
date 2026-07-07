@@ -58,14 +58,15 @@ test('substituteVariables: variable with no whitespace in braces', () => {
 
 test('substituteVariables: missing variable remains as normalized placeholder', () => {
   const result = substituteVariables('Hello {{ unknown }}!', {});
-  // The regex replaces {{ unknown }} with {{unknown}} (no spaces) when not found
-  assert.strictEqual(result, 'Hello {{unknown}}!');
+  // The regex preserves original spacing when variable is not found
+  assert.strictEqual(result, 'Hello {{ unknown }}!');
 });
 
 test('substituteVariables: empty variables object leaves all placeholders', () => {
   const content = '{{ foo }} and {{ bar }}';
   const result = substituteVariables(content, {});
-  assert.strictEqual(result, '{{foo}} and {{bar}}');
+  // The regex preserves original spacing when variables are not found
+  assert.strictEqual(result, '{{ foo }} and {{ bar }}');
 });
 
 test('substituteVariables: no variables in content returns content unchanged', () => {
@@ -79,7 +80,8 @@ test('substituteVariables: mixed - some found, some not', () => {
     '{{ found }} and {{ missing }}',
     { found: 'YES' }
   );
-  assert.strictEqual(result, 'YES and {{missing}}');
+  // The regex preserves original spacing when variable is not found
+  assert.strictEqual(result, 'YES and {{ missing }}');
 });
 
 test('substituteVariables: repeated variable is substituted in all occurrences', () => {
@@ -95,8 +97,14 @@ test('substituteVariables: empty string content', () => {
   assert.strictEqual(result, '');
 });
 
-test('substituteVariables: value containing braces is not re-processed', () => {
-  // Substituted values should be inserted literally, no recursive substitution
+test('substituteVariables: value containing braces is recursively expanded', () => {
+  // With recursive expansion, {{ other }} in the value will be expanded if 'other' exists
+  const result = substituteVariables('{{ name }}', { name: '{{ other }}', other: 'expanded' });
+  assert.strictEqual(result, 'expanded');
+});
+
+test('substituteVariables: value containing braces remains as-is if nested variable not found', () => {
+  // With recursive expansion, {{ other }} in the value will remain as-is if 'other' doesn't exist
   const result = substituteVariables('{{ name }}', { name: '{{ other }}' });
   assert.strictEqual(result, '{{ other }}');
 });

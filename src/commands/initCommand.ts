@@ -14,6 +14,71 @@ export interface InitOptions {
   file?: string;
 }
 
+/**
+ * Scan parent directories for .env files and parse their variables.
+ * Returns a map of variable names to their values, supporting:
+ * - KEY=VALUE format
+ * - KEY="VALUE with spaces" format
+ * - KEY='VALUE with spaces' format
+ * - Comments (lines starting with #)
+ * - Empty lines
+ */
+function scanEnvForVariables(targetPath: string): Record<string, string> {
+  const envVars: Record<string, string> = {};
+  let currentDir = path.resolve(targetPath);
+  
+  // Scan up to 5 parent directories for .env files
+  const maxDepth = 5;
+  
+  for (let depth = 0; depth < maxDepth; depth++) {
+    const envPath = path.join(currentDir, '.env');
+    
+    if (fs.existsSync(envPath)) {
+      try {
+        const content = fs.readFileSync(envPath, 'utf-8');
+        const lines = content.split('\n');
+        
+        for (const line of lines) {
+          const trimmed = line.trim();
+          
+          // Skip empty lines and comments
+          if (!trimmed || trimmed.startsWith('#')) {
+            continue;
+          }
+          
+          // Match KEY=VALUE patterns
+          const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);
+          if (match) {
+            const key = match[1];
+            let value = match[2];
+            
+            // Remove surrounding quotes if present
+            if ((value.startsWith('"') && value.endsWith('"')) || 
+                (value.startsWith("'") && value.endsWith("'"))) {
+              value = value.slice(1, -1);
+            }
+            
+            envVars[key] = value;
+          }
+        }
+      } catch (err) {
+        // Silently skip unreadable .env files
+        continue;
+      }
+    }
+    
+    // Move to parent directory
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      // Reached filesystem root
+      break;
+    }
+    currentDir = parentDir;
+  }
+  
+  return envVars;
+}
+
 export async function init(targetName: string | undefined, destPath: string | undefined, options: InitOptions = {}) {
   const config = loadConfig();
 
@@ -103,6 +168,18 @@ export async function init(targetName: string | undefined, destPath: string | un
   // Handle Variables
   let variables: Record<string, string> = {};
   if (template.variables && template.variables.length > 0) {
+    // Scan parent directories for .env files and pre-fill variables
+    const envVars = scanEnvForVariables(resolvedDest);
+    
+    // Merge .env variables into variables (with lower priority than --vars)
+    if (Object.keys(envVars).length > 0) {
+      for (const [key, value] of Object.entries(envVars)) {
+        if (!variables[key]) {
+          variables[key] = value;
+        }
+      }
+    }
+    
     if (options.vars) {
       // Parse --vars "key=val,key2=val2"
       const pairs = options.vars.split(',').map((p: string) => p.trim());

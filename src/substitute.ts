@@ -7,14 +7,39 @@ import { sanitizePath } from './config.js';
 
 /**
  * Replaces all {{var}} patterns in the content with values from the variables object.
+ * Supports nested variable expansion - if a variable's value contains {{other_var}},
+ * it will be expanded iteratively until no more placeholders remain or maxIterations is reached.
  */
 export function substituteVariables(
   content: string,
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  maxIterations: number = 10
 ): string {
-  return content.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, varName) => {
-    return variables[varName] ?? `{{${varName}}}`;
-  });
+  let result = content;
+  let iteration = 0;
+  
+  // Keep expanding until no more placeholders remain or we hit the limit
+  while (/\{\{[^}]+\}\}/.test(result) && iteration < maxIterations) {
+    // Use a more complex regex that captures the full placeholder including spaces
+    result = result.replace(/(\{\{\s*)(\w+)(\s*\}\})/g, (_, prefix, varName, suffix) => {
+      const val = variables[varName];
+      // If variable not found, leave placeholder as-is with original spacing
+      if (val === undefined) {
+        return `${prefix}${varName}${suffix}`;
+      }
+      // Return the value (which may contain more placeholders to expand)
+      return val;
+    });
+    iteration++;
+    
+    // Prevent infinite loops by checking if we're stuck
+    if (iteration > 1 && result === content) {
+      console.warn(chalk.yellow(`Warning: Potential infinite loop detected in variable expansion, stopping after ${iteration} iterations`));
+      break;
+    }
+  }
+  
+  return result;
 }
 
 /**

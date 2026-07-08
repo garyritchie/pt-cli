@@ -45,13 +45,15 @@ graph LR
 - Initialize new projects from learned templates
 - Define template variables for dynamic file customization
 - **Automatic Variable Detection:** Scans text files for `{{ var }}` syntax during `learn`/`update`
+- **Nested Variable Expansion (v0.36.0+):** Variables can contain other variable placeholders that are resolved iteratively
+- **Parent Directory `.env` File Scanning:** Automatically scans parent directories for `.env` files and uses their values as defaults
 - Auto-detect and suggest post-config setup tasks
 - Configure global post-config tasks in `~/.pt/config.yaml` (apply to all projects)
 - Baked-in defaults for common project types (javascript, python, godot, etc.)
 - Share templates or use as an API with JSON export/import
 - **Direct JSON scaffolding:** Initialize projects from a JSON file without registering in `config.yaml`
 - **Portable template configs:** `.pt-template.json` files make shared directories fully self-describing
-- Fully supports non-interactive mode (`--yes`, `--vars`) for AI agent automation
+- Fully supports non-interactive mode (`--yes`, `--vars`, `--name`, `--desc`) for AI agent automation
 
 ## Quick Start
 

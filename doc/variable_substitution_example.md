@@ -76,3 +76,67 @@ The resulting `package.json` in `my-new-project/` will be:
   "license": "MIT"
 }
 ```
+
+## 4. Nested Variable Expansion (v0.36.0+)
+
+Starting with v0.36.0, you can use **nested variables** for more complex configurations. Create a `.env` file in your project directory or parent directory:
+
+```bash
+# .env file in parent directory
+prefix='rst_'
+project=MyProject
+```
+
+Then use these variables in your template files:
+
+**`templates/README.md.tmpl`**:
+```markdown
+# {{prefix}}{{project}}
+
+This is a nested variable example where:
+- prefix = 'rst_'
+- project = 'MyProject'
+- Result: 'rst_MyProject'
+```
+
+**Even more complex nesting:**
+```bash
+# .env file
+prefix='app_{{ env }}'
+env=prod
+project=MyApp
+version=2.0
+```
+
+Then in your template:
+```json
+{
+  "name": "{{prefix}}_{{project}}",
+  "version": "{{version}}"
+}
+```
+
+This will resolve to:
+```json
+{
+  "name": "app_prod_MyApp",
+  "version": "2.0"
+}
+```
+
+**How it works:**
+1. `pt` scans parent directories for `.env` files
+2. Loads variables from `.env` as defaults
+3. Expands nested placeholders iteratively (up to 10 passes)
+4. Resolves circular references gracefully
+
+**Example with nested placeholders:**
+```bash
+# .env file
+template_path='docs/{{ project }}'
+project=wiki
+```
+
+Result: `template_path` becomes `docs/wiki`
+
+**Important:** Missing nested variables remain as `{{ variable }}` placeholders (with preserved whitespace) to help identify configuration issues.

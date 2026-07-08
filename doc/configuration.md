@@ -28,6 +28,58 @@ Instead of manual definition, `pt learn` and `pt update` automatically scan for 
 
 These variables are then used during `copy_files` operations to replace `{{variable_name}}` placeholders in copied files.
 
+### Nested Variable Expansion (v0.36.0+)
+
+Starting with v0.36.0, `pt` supports **nested variable expansion** — variables can contain other variable placeholders that are resolved iteratively. This enables powerful configuration patterns like:
+
+```bash
+# In ~/.env or parent directory .env file:
+prefix='rst_{{ project }}'
+project=MyProject
+```
+
+During initialization, the system will:
+1. Load `prefix='rst_{{ project }}'` from `.env`
+2. Detect that `prefix` contains a `{{ project }}` placeholder
+3. Resolve `{{ project }}` to `MyProject`
+4. Set `prefix` to `rst_MyProject`
+
+This is particularly useful for:
+- **Project naming conventions**: `prefix='app_{{ env }}'` + `env=prod` → `app_prod`
+- **Path templates**: `template_path='docs/{{ project }}'` + `project=wiki` → `docs/wiki`
+- **Multi-level configurations**: Combine multiple `.env` files with nested references
+
+**How it works:**
+- Variables are expanded iteratively (up to 10 passes) to prevent infinite loops
+- Circular references are detected and stopped gracefully
+- Missing nested variables remain as `{{ variable }}` placeholders
+- Whitespace is preserved: `{{ unknown }}` stays as `{{ unknown }}` (not `{{unknown}}`)
+
+### Parent Directory `.env` File Scanning
+
+`pt` automatically scans parent directories for `.env` files and uses their values as defaults during initialization. This enables:
+
+- **Project-wide defaults**: Store common values in a parent `.env` file
+- **Environment-specific configurations**: Use different `.env` files for dev/staging/prod
+- **Team collaboration**: Share common variable values across team projects
+
+**Example:**
+```bash
+# Project structure:
+my-project/
+├── .env          # Contains: prefix='rst_'
+├── sub-project/  # Initialize here
+│   └── ...
+```
+
+When you run `pt init my-template sub-project`, the `prefix` variable will be pre-filled with `rst_` from the parent `.env` file.
+
+**Behavior:**
+- Scans from the current directory up to 3 parent levels
+- Uses values from `.env` as defaults (still prompts if not in `.env`)
+- `--vars` CLI option overrides `.env` values
+- `.env` files are not committed to version control (use `.gitignore`)
+
 ## Post-Config Tasks
 
 Post-config tasks are optional commands that run after a project is initialized. They can be defined in a template or auto-detected from the source directory.

@@ -86,6 +86,9 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       process.exit(1);
     }
   } else {
+    // Track whether name came from .info.md or JSON (not user-provided)
+    const nameFromSource = !options.name && (fileTemplateConfig.name || infoName);
+    
     if (options.name) {
       targetName = options.name;
     } else if (fileTemplateConfig.name) {
@@ -105,6 +108,34 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
           default: path.basename(resolvedPath)
         });
         targetName = newName;
+      }
+    }
+    
+    // If name came from .info.md or JSON, prompt to confirm/edit
+    // This prevents accidental overwrites when creating new templates based on existing ones
+    if (nameFromSource && !options.json) {
+      if (options.yes) {
+        // In --yes mode, keep the auto-detected name but warn
+        const existingNames = getTemplateNames(config);
+        if (existingNames.includes(targetName)) {
+          console.warn(chalk.yellow(`⚠ Warning: "${targetName}" already exists. Using this name will overwrite the existing template.`));
+        }
+      } else {
+        const { confirmName } = await inquirer.prompt({
+          type: 'confirm',
+          name: 'confirmName',
+          message: `Use "${targetName}" as the template name?`,
+          default: true
+        });
+        if (!confirmName) {
+          const { newName } = await inquirer.prompt({
+            type: 'input',
+            name: 'newName',
+            message: 'Name this template:',
+            default: targetName
+          });
+          targetName = newName;
+        }
       }
     }
   }
@@ -137,6 +168,9 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       }
     }
   } else {
+    // Track whether description came from .info.md or JSON (not user-provided)
+    const descFromSource = !options.desc && (fileTemplateConfig.description || infoDesc);
+    
     if (fileTemplateConfig.description) {
       description = fileTemplateConfig.description;
       if (!options.json) console.log(chalk.cyan(`Auto-detected template description from JSON: ${description}`));
@@ -153,6 +187,34 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
         default: targetName
       });
       description = newDesc;
+    }
+    
+    // If description came from .info.md or JSON, prompt to confirm/edit
+    // This prevents accidental overwrites when creating new templates based on existing ones
+    if (descFromSource && !options.json) {
+      if (options.yes) {
+        // In --yes mode, keep the auto-detected description but warn
+        const existingNames = getTemplateNames(config);
+        if (existingNames.includes(targetName)) {
+          console.warn(chalk.yellow(`⚠ Warning: "${targetName}" already exists. Using this name will overwrite the existing template.`));
+        }
+      } else {
+        const { confirmDesc } = await inquirer.prompt({
+          type: 'confirm',
+          name: 'confirmDesc',
+          message: `Use "${description}" as the template description?`,
+          default: true
+        });
+        if (!confirmDesc) {
+          const { newDesc } = await inquirer.prompt({
+            type: 'input',
+            name: 'newDesc',
+            message: 'Purpose/Description of this template:',
+            default: description
+          });
+          description = newDesc;
+        }
+      }
     }
   }
 

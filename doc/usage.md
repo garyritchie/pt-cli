@@ -46,6 +46,72 @@ During `pt learn` or `pt update`, the tool automatically scans text files at the
 - **Global Suggestions:** Your global variables (defined in `~/.pt/config.yaml`) are automatically injected as additional suggestions during the learn process.
 - **Updating:** You can add new placeholders to a project folder and run `pt update <template_name>` to automatically register them in your existing template.
 
+### Using `.env` Files for Variable Defaults (v0.36.0+)
+
+Starting with v0.36.0, `pt` automatically scans parent directories for `.env` files and uses their values as defaults during initialization. This enables powerful configuration patterns:
+
+```bash
+# Create a .env file in your project directory
+echo "prefix='rst_'" > .env
+echo "project='MyProject'" >> .env
+
+# Initialize a project - variables are pre-filled from .env
+pt init my-template my-new-project
+```
+
+**Key Features:**
+- **Automatic Scanning:** Scans up to 3 parent directories for `.env` files
+- **Variable Pre-filling:** Values from `.env` are used as defaults in prompts
+- **Nested Variables:** Supports nested placeholders like `prefix='app_{{ env }}'`
+- **Override Support:** Use `--vars` to override `.env` values: `--vars project=OverriddenProject`
+
+**Example with Nested Variables:**
+```bash
+# .env file
+prefix='app_{{ env }}'
+env=prod
+project=MyApp
+
+# Template README.md.tmpl
+# Content: {{prefix}}_{{project}}
+
+# Result: app_prod_MyApp
+```
+
+**Security Note:** `.env` files are not committed to version control. Use `.gitignore` to exclude them:
+```bash
+# .gitignore
+.env
+*.env
+```
+
+### Nested Variable Expansion (v0.36.0+)
+
+The `pt` CLI now supports **nested variable expansion** — variables can contain other variable placeholders that are resolved iteratively. This enables powerful configuration patterns:
+
+```bash
+# In .env file:
+prefix='rst_{{ project }}'
+project=MyProject
+
+# During initialization, the system will:
+# 1. Load prefix='rst_{{ project }}' from .env
+# 2. Detect that prefix contains a {{ project }} placeholder
+# 3. Resolve {{ project }} to MyProject
+# 4. Set prefix to rst_MyProject
+```
+
+**Use Cases:**
+- **Project naming conventions:** `prefix='app_{{ env }}'` + `env=prod` → `app_prod`
+- **Path templates:** `template_path='docs/{{ project }}'` + `project=wiki` → `docs/wiki`
+- **Multi-level configurations:** Combine multiple `.env` files with nested references
+
+**How it works:**
+- Variables are expanded iteratively (up to 10 passes) to prevent infinite loops
+- Circular references are detected and stopped gracefully
+- Missing nested variables remain as `{{ variable }}` placeholders
+- Whitespace is preserved: `{{ unknown }}` stays as `{{ unknown }}` (not `{{unknown}}`)
+
 ## Initialize a project
 
 ```bash

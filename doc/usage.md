@@ -60,12 +60,14 @@ pt init my-template my-new-project
 ```
 
 **Key Features:**
+
 - **Automatic Scanning:** Scans up to 3 parent directories for `.env` files
 - **Variable Pre-filling:** Values from `.env` are used as defaults in prompts
 - **Nested Variables:** Supports nested placeholders like `prefix='app_{{ env }}'`
 - **Override Support:** Use `--vars` to override `.env` values: `--vars project=OverriddenProject`
 
 **Example with Nested Variables:**
+
 ```bash
 # .env file
 prefix='app_{{ env }}'
@@ -79,6 +81,7 @@ project=MyApp
 ```
 
 **Security Note:** `.env` files are not committed to version control. Use `.gitignore` to exclude them:
+
 ```bash
 # .gitignore
 .env
@@ -102,11 +105,13 @@ project=MyProject
 ```
 
 **Use Cases:**
+
 - **Project naming conventions:** `prefix='app_{{ env }}'` + `env=prod` → `app_prod`
 - **Path templates:** `template_path='docs/{{ project }}'` + `project=wiki` → `docs/wiki`
 - **Multi-level configurations:** Combine multiple `.env` files with nested references
 
 **How it works:**
+
 - Variables are expanded iteratively (up to 10 passes) to prevent infinite loops
 - Circular references are detected and stopped gracefully
 - Missing nested variables remain as `{{ variable }}` placeholders

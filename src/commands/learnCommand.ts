@@ -588,8 +588,8 @@ function extractStructure(dirPath: string, rootPath: string, ignorePatterns?: st
       let info = "";
       const gitkeepPath = path.join(fullPath, '.gitkeep.md');
       const infoPath = path.join(fullPath, '.info.md');
-      if (fs.existsSync(gitkeepPath)) info = fs.readFileSync(gitkeepPath, 'utf-8').trim();
-      else if (fs.existsSync(infoPath)) info = fs.readFileSync(infoPath, 'utf-8').trim();
+      if (fs.existsSync(infoPath)) info = fs.readFileSync(infoPath, 'utf-8').trim();
+      else if (fs.existsSync(gitkeepPath)) info = fs.readFileSync(gitkeepPath, 'utf-8').trim();
       nodes.push({ name: entry.name, info: info, children: children });
     }
   } catch (e) {}

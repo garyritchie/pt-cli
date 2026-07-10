@@ -39,17 +39,20 @@ project=MyProject
 ```
 
 During initialization, the system will:
+
 1. Load `prefix='rst_{{ project }}'` from `.env`
 2. Detect that `prefix` contains a `{{ project }}` placeholder
 3. Resolve `{{ project }}` to `MyProject`
 4. Set `prefix` to `rst_MyProject`
 
 This is particularly useful for:
+
 - **Project naming conventions**: `prefix='app_{{ env }}'` + `env=prod` → `app_prod`
 - **Path templates**: `template_path='docs/{{ project }}'` + `project=wiki` → `docs/wiki`
 - **Multi-level configurations**: Combine multiple `.env` files with nested references
 
 **How it works:**
+
 - Variables are expanded iteratively (up to 10 passes) to prevent infinite loops
 - Circular references are detected and stopped gracefully
 - Missing nested variables remain as `{{ variable }}` placeholders
@@ -64,6 +67,7 @@ This is particularly useful for:
 - **Team collaboration**: Share common variable values across team projects
 
 **Example:**
+
 ```bash
 # Project structure:
 my-project/
@@ -75,6 +79,7 @@ my-project/
 When you run `pt init my-template sub-project`, the `prefix` variable will be pre-filled with `rst_` from the parent `.env` file.
 
 **Behavior:**
+
 - Scans from the current directory up to 3 parent levels
 - Uses values from `.env` as defaults (still prompts if not in `.env`)
 - `--vars` CLI option overrides `.env` values
@@ -109,6 +114,7 @@ If the directory contains a `.pt-template.json` or `template.json` file with a `
 3. Alternatively, initialize a temporary project from your learned template (`pt init`), refine it manually, and then use `pt update` from that directory to "re-learn" the refined state.
 
 **Security Note:** All post-config commands are subject to security validation:
+
 - Dangerous commands (e.g., `curl`, `python`, `chmod`) trigger warnings with 5-second cancellation
 - Absolute blocks (e.g., `sudo`, `rm -rf`, `dd`) are never allowed
 - Rate limiting prevents runaway execution (50 commands per run)
@@ -177,7 +183,7 @@ Each task supports:
 
 ## Default Post-Config
 
-Default post-config tasks are defined at the top level of `~/.pt/config.yaml` under `default_post_config`. They serve as suggestions when creating or updating templates via `pt learn`. 
+Default post-config tasks are defined at the top level of `~/.pt/config.yaml` under `default_post_config`. They serve as suggestions when creating or updating templates via `pt learn`.
 
 Unlike previous versions, default tasks are **not** automatically applied during `pt init`. Instead, you select which ones to include when learning a template, and those selections are baked into the template's `post_config` list. This eliminates the need to repeat boilerplate setup (e.g. `git init`) across templates while keeping each template fully self-contained.
 
@@ -189,21 +195,21 @@ default_post_config:
     description: "Initialize git repository"
   - command: "git add -A && git commit -m 'Initial commit'"
     description: "Initial git commit"
-    checked: false  # default on, but user must manually check
+    checked: false # default on, but user must manually check
   - command: "git lfs install"
     description: "Install git-lfs hooks"
-    type: "godot"  # only applies to godot projects
+    type: "godot" # only applies to godot projects
 ```
 
 ### Fields
 
 Each default task supports the same fields as template post-config:
 
-| Field         | Description                                                                      |
-| ------------- | -------------------------------------------------------------------------------- |
-| `command`     | Shell command to run                                                             |
-| `description` | Shown to user during interactive selection                                       |
-| `checked`     | Default checkbox state (`true` by default); set `false` to require manual opt-in |
+| Field         | Description                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| `command`     | Shell command to run                                                                               |
+| `description` | Shown to user during interactive selection                                                         |
+| `checked`     | Default checkbox state (`true` by default); set `false` to require manual opt-in                   |
 | `type`        | Filter by project type (e.g. `"javascript"`); if set, task only applies when template type matches |
 
 ### Behavior
@@ -215,6 +221,7 @@ Each default task supports the same fields as template post-config:
 
 You can view current default tasks using `pt config` or `pt default-post-config`.
 To update default tasks programmatically or via CLI, use the `pt default-post-config` command:
+
 - `pt default-post-config`: List current default post-config tasks.
 - `pt default-post-config --set --json '...'`: Replace the default post-config tasks list via a JSON string or file.
 
@@ -299,6 +306,7 @@ Each entry supports:
 A plausible scenario for customizing a new project's `package.json` and `README.md`:
 
 **1. Define in `config.yaml`**:
+
 ```yaml
 templates:
   node_web_app:
@@ -317,6 +325,7 @@ templates:
 ```
 
 **2. Template source (`templates/package.json.tmpl`)**:
+
 ```json
 {
   "name": "{{project_name}}",
@@ -327,6 +336,7 @@ templates:
 
 **3. Resulting project file**:
 If the user enters `my-service` and `Jane Doe`, the file `package.json` will be created with:
+
 ```json
 {
   "name": "my-service",

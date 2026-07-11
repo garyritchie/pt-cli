@@ -39,14 +39,17 @@ program
       await learn(pathArg || '.', null, options);
     } catch (err: any) {
       if (options.json) {
-        console.log(JSON.stringify({
+        // Fix: Ensure the error JSON payload isn't truncated before exiting
+        process.stdout.write(JSON.stringify({
           type: 'error',
           message: err.message || String(err)
-        }));
+        }) + '\n', () => {
+          process.exit(1);
+        });
       } else {
         console.error(chalk.red(`Error: ${err.message || err}`));
+        process.exit(1);
       }
-      process.exit(1);
     }
   });
 

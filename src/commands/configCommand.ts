@@ -15,13 +15,20 @@ export function configCommand(templateName: string | undefined, options: ConfigO
           name: templateName,
           ...config.templates[templateName]
         };
-        console.log(JSON.stringify(output, null, 2));
+        // Safely drain stdout before allowing the process to close
+        process.stdout.write(JSON.stringify(output, null, 2) + '\n', () => {
+          process.exit(0);
+        });
       } else {
-        console.error(chalk.red(`Error: Template "${templateName}" not found.`));
-        process.exit(1);
+        process.stderr.write(chalk.red(`Error: Template "${templateName}" not found.\n`), () => {
+          process.exit(1);
+        });
       }
     } else {
-      console.log(JSON.stringify(config, null, 2));
+      // Safely drain the entire global config payload
+      process.stdout.write(JSON.stringify(config, null, 2) + '\n', () => {
+        process.exit(0);
+      });
     }
     return;
   }

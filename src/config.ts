@@ -148,12 +148,24 @@ export function loadConfig(): PtConfig {
   } catch (err) {
     const error = err as Error;
     console.error(chalk.red(`\nError loading config: ${error.message}`));
-    // If we have a backup, maybe suggest using it
     const backupPath = getConfigPath() + '.bak';
     if (fs.existsSync(backupPath)) {
       console.error(chalk.yellow(`A backup exists at ${backupPath}. You may want to restore it.`));
     }
-    process.exit(1);
+    
+    // Allow the event loop to flush console streams out to Godot before dying
+    setTimeout(() => {
+      process.exit(1);
+    }, 5);
+
+    // 👇 Add this return statement to satisfy the TypeScript compiler
+    // The application will terminate before this empty config can be used.
+    return {
+      version: '3.0',
+      templates: {},
+      default_post_config: [],
+      variables: []
+    };
   }
 }
 

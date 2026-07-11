@@ -542,11 +542,16 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   }
 
   if (options.json) {
-    const output = {
-      name: targetName,
-      ...templateConfig
-    };
-    console.log(JSON.stringify(output, null, 2));
+  const output = {
+    name: targetName,
+    ...templateConfig
+  };
+  
+    // Force the application to wait until every single byte of this JSON string 
+    // safely clears the operating system's pipe buffer before letting the process die.
+    process.stdout.write(JSON.stringify(output, null, 2) + '\n', () => {
+      process.exit(0);
+    });
     return;
   }
 

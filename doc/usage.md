@@ -7,8 +7,12 @@
 pt learn /path/to/PROJECT
 
 # Update an existing template (use current directory if no path given)
+# (Runs in additive difference mode by default: shows only new items, auto-selected, for de-selection)
 pt update <template_name>
 pt update <template_name> /path/to/PROJECT
+
+# Use full mode (original behavior, presents all items)
+pt update <template_name> /path/to/PROJECT --no-diff
 
 # Ignore specific folders during learning
 pt learn /path/to/PROJECT --ignore=DAILIES/*,PARKING_LOT/*,REFERENCE/*

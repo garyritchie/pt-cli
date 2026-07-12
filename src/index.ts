@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 
 // Command imports
 import { learn } from './commands/learnCommand.js';
+import { update } from './commands/updateCommand.js';
 import { init } from './commands/initCommand.js';
 import { configCommand } from './commands/configCommand.js';
 import { ignoreCommand } from './commands/ignoreCommand.js';
@@ -59,9 +60,10 @@ program
   .option('--ignore <patterns>', 'Folder patterns to ignore (comma-separated)')
   .option('-y, --yes', 'Automatically confirm prompts')
   .option('--desc <description>', 'Template description (skip prompt)')
+  .option('--no-diff', 'Disable additive mode, show full list')
   .action(async (templateName: string, sourcePath: string | undefined, options) => {
     try {
-      await learn(sourcePath || '.', templateName, options);
+      await update(sourcePath || '.', templateName, options);
     } catch (err: any) {
       console.error(chalk.red(`Error: ${err.message || err}`));
       process.exit(1);

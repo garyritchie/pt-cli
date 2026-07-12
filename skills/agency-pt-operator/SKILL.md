@@ -27,7 +27,11 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
 3. **Capturing Knowledge (`pt learn`):**
    If you spend time establishing a new, complex directory structure or configuration (e.g., a specific flavor of an Express backend with testing hooks), save it! Remote URLs (GitHub, Gitea, etc.) are automatically translated to tarball downloads.
    - **Command:** `pt learn <source_path> --name <template_name> --desc "<Description>" --yes`
-   - **Update existing template:** Update an existing template with new structure/files: `pt update <template_name> <source_path> --yes`
+   - **Update existing template:** Update an existing template with new structure/files: `pt update <template_name> <source_path> --yes`.
+     - **Additive Difference Mode (Default):** By default, `pt update` operates in an additive mode that only presents *new* folders, files, and variables from the target directory to the user for de-selection. Existing items and their configurations (such as `substitute_variables` and `post_copy` settings) are preserved as-is.
+     - **Editing Metadata:** During update, description and templateRoot are presented for editing with the existing template values pre-filled as defaults.
+     - **Global/Default Variables:** Default/global variables require the user to explicitly opt-in via checkboxes, rather than being automatically added.
+     - **Full/Original Mode:** To review all items manually instead of showing differences only, pass the `--no-diff` flag: `pt update <template_name> <source_path> --no-diff`
    - **Remote Templates:** Learn from a remote Git repository or archive URL directly! Pass the HTTP/HTTPS URL as the `<source_path>`:
      `pt learn https://github.com/username/my-template --name my_template --desc "Description" --yes`
    - Explain to the user that you've captured this template for future use.
@@ -191,7 +195,7 @@ For more details, see the [Security Guide](security.md).
 | Command | Description |
 |---------|-------------|
 | `pt learn <path>` | Learn a project structure from an existing directory |
-| `pt update <template> [path]` | Update an existing template with new structure/files |
+| `pt update <template> [path]` | Update an existing template (additive difference mode by default, use --no-diff for full mode) |
 | `pt init [template] [dest]` | Initialize a new project from a learned template |
 | `pt config [template]` | Show current config location and list templates, or export a specific template |
 | `pt variables [pairs]` | View or set global variables (comma-separated key=value) |

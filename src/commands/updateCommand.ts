@@ -414,9 +414,11 @@ export async function update(sourcePath: string, templateName: string, options: 
   
    if (!isFullMode) {
      // Additive mode for files and folders
-     // Start with existing files and folders, preserving their substitute_variables settings
+     // Start with existing copy_files entries as the base (preserves all settings including substitute_variables)
      const existingCopyFiles = config.templates[templateName].copy_files || [];
-     selectedFiles = existingCopyFiles.map(f => f.src);
+     // selectedFiles here is only used to track new file names to append
+     let newSelectedFiles: string[] = [];
+     let newSelectedFolderDirs: string[] = [];
     
      const fileDiff = getNewFiles(config.templates[templateName], resolvedPath);
     
@@ -442,37 +444,39 @@ export async function update(sourcePath: string, templateName: string, options: 
              checked: true // Auto-select by default
            }))
          });
-         // Only add selected files
-         selectedFiles.push(...fileDiff.newFiles.filter(f => selectedFileChoices.includes(f)));
+         newSelectedFiles = fileDiff.newFiles.filter(f => selectedFileChoices.includes(f));
        } else {
          // In --yes or --json mode, auto-add all
-         selectedFiles.push(...fileDiff.newFiles);
+         newSelectedFiles = [...fileDiff.newFiles];
        }
      } else {
        console.log(chalk.cyan("No new files detected"));
      }
     
-    // For folders, use additive mode logic
-    // Always preserve existing folders first
-    selectedStructure = config.templates[templateName].folders?.map(f => f.name) || [];
-    selectedFolders = selectedStructure.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
-    
-    if (rootDirs.length > 0) {
-      const structureDiff = getNewFolders(config.templates[templateName].folders, resolvedPath, ignorePatterns);
-      
-      if (structureDiff.added.length > 0) {
-        // Auto-select added folders for structure
-        selectedStructure = [...new Set([...selectedStructure, ...structureDiff.added.map(f => f.name)])];
-        // Auto-select for recursive copy if they're in the standard list
-        selectedFolders = selectedStructure.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
-      } else {
-        // Keep existing folders
-        selectedFolders = selectedStructure.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
-      }
-    } else {
-      // Keep existing folders
-      selectedFolders = selectedStructure.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
-    }
+     // For folders, use additive mode logic
+     // Preserve existing folder structure
+     selectedStructure = config.templates[templateName].folders?.map(f => f.name) || [];
+     // Seed selectedFolders from existing copy_files directory entries (not a hardcoded list)
+     selectedFolders = existingCopyFiles
+       .filter(f => rootDirs.includes(f.src))
+       .map(f => f.src);
+     
+     if (rootDirs.length > 0) {
+       const structureDiff = getNewFolders(config.templates[templateName].folders, resolvedPath, ignorePatterns);
+       
+       if (structureDiff.added.length > 0) {
+         // Auto-select added folders for structure
+         selectedStructure = [...new Set([...selectedStructure, ...structureDiff.added.map(f => f.name)])];
+         // For new dirs, auto-select for recursive copy if they match the standard list
+         newSelectedFolderDirs = structureDiff.added
+           .filter(f => ['APP', 'scripts', 'bin'].some(p => f.name === p))
+           .map(f => f.name);
+       }
+     }
+     // Merge: existing folder copy_files + newly selected dirs
+     selectedFolders = [...new Set([...selectedFolders, ...newSelectedFolderDirs])];
+     // Also carry forward file names for use in copy_files construction below
+     selectedFiles = [...existingCopyFiles.filter(f => !rootDirs.includes(f.src)).map(f => f.src), ...newSelectedFiles];
   } else {
     // Full mode: original behavior
     if (options.yes || options.json) {
@@ -552,31 +556,32 @@ export async function update(sourcePath: string, templateName: string, options: 
   const copy_files: CopyFileEntry[] = [];
   if (fileTemplateConfig.copy_files && Array.isArray(fileTemplateConfig.copy_files)) {
     copy_files.push(...fileTemplateConfig.copy_files);
-  } else {
+  } else if (!isFullMode) {
+    // Additive mode: start directly from the existing copy_files to preserve all settings,
+    // then append only brand-new entries (never rebuild from scratch).
     const existingCopyFiles = config.templates[templateName].copy_files || [];
-    const existingMap = new Map<string, CopyFileEntry>();
-    for (const entry of existingCopyFiles) {
-      existingMap.set(entry.src, entry);
-    }
-    const addedSrcs = new Set<string>();
+    const existingSrcs = new Set(existingCopyFiles.map(e => e.src));
 
+    // Begin with all existing entries untouched
+    copy_files.push(...existingCopyFiles);
+
+    // Append new files that were selected by the user
     for (const f of selectedFiles) {
-      if (addedSrcs.has(f)) continue;
-      addedSrcs.add(f);
-      if (existingMap.has(f)) {
-        copy_files.push(existingMap.get(f)!);
-      } else {
-        copy_files.push({ src: f, dest: f, substitute_variables: true });
-      }
+      if (existingSrcs.has(f)) continue; // already present, skip
+      copy_files.push({ src: f, dest: f, substitute_variables: true });
+    }
+    // Append new directory entries that were selected
+    for (const d of selectedFolders) {
+      if (existingSrcs.has(d)) continue; // already present, skip
+      copy_files.push({ src: d, dest: d, substitute_variables: true });
+    }
+  } else {
+    // Full mode: build from scratch using the selected files/folders
+    for (const f of selectedFiles) {
+      copy_files.push({ src: f, dest: f, substitute_variables: true });
     }
     for (const d of selectedFolders) {
-      if (addedSrcs.has(d)) continue;
-      addedSrcs.add(d);
-      if (existingMap.has(d)) {
-        copy_files.push(existingMap.get(d)!);
-      } else {
-        copy_files.push({ src: d, dest: d, substitute_variables: true });
-      }
+      copy_files.push({ src: d, dest: d, substitute_variables: true });
     }
   }
 

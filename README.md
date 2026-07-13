@@ -136,8 +136,6 @@ Equipping your agent with this skill allows it to automatically use `pt-cli` to 
 * **[Configuration Guide](doc/configuration.md)** - Template variables, post-config tasks, file copying, and more.
 * **[Exclusions](doc/exclusions.md)** - Learn about default ignored files and how to set custom patterns.
 
-*(Note: Update the hash links above to point to your specific documentation files/wikis if applicable)*
-
 ## Development
 
 * `src/index.ts`: Entry point and command registration.

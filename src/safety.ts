@@ -21,6 +21,8 @@ const BLOCKED_COMMANDS = [
   'nc', 'netcat', 'socat',
   // Package manager with dangerous flags
   'apt purge', 'apt remove', 'yum remove', 'brew uninstall',
+  // Aliases for the above
+  'apt-get purge', 'apt-get remove',
 ];
 
 // === DANGEROUS PATTERNS ===
@@ -31,13 +33,16 @@ const DANGEROUS_PATTERNS = [
   // Script execution
   'bash', 'sh', 'python', 'python3', 'node -e', 'node -p',
   // Shell operations
-  'eval', 'exec', 'source',
+  'eval', 'exec', 'source', '.',
   // File system manipulation
   'chmod -R', 'chown -R', 'chgrp -R',
   // PowerShell (Windows)
   'powershell', 'pwsh', 'Invoke-Expression', 'IEX',
   // macOS-specific
   'diskutil', 'hdiutil', 'csrutil',
+  // Aliases
+  'python2', 'python3.10', 'python3.11', 'python3.12',
+  'node', 'npm run', 'npx',
 ];
 
 // Shell metacharacters that indicate command chaining/injection attempts
@@ -119,7 +124,12 @@ function parseShellCommand(command: string): { baseCommand: string; args: string
     return { baseCommand: '', args: [], hasMetacharacters };
   }
 
-  const baseCommand = parts[commandIndex];
+  let baseCommand = parts[commandIndex];
+  // Strip surrounding quotes if present
+  if ((baseCommand.startsWith('"') && baseCommand.endsWith('"')) ||
+      (baseCommand.startsWith("'") && baseCommand.endsWith("'"))) {
+    baseCommand = baseCommand.slice(1, -1);
+  }
   const args = parts.slice(commandIndex + 1);
 
   return { baseCommand, args, hasMetacharacters };
@@ -128,7 +138,7 @@ function parseShellCommand(command: string): { baseCommand: string; args: string
 /**
  * Check if a base command matches a blocked command (exact or prefix match)
  */
-function isCommandBlocked(baseCommand: string): boolean {
+function isCommandBlocked(baseCommand: string, args: string[] = []): boolean {
   // Normalize the command (resolve path if needed)
   const cmd = baseCommand.toLowerCase();
 
@@ -138,6 +148,23 @@ function isCommandBlocked(baseCommand: string): boolean {
     if (cmd === blockedLower || cmd.startsWith(blockedLower + ' ') || cmd.startsWith(blockedLower + '/')) {
       return true;
     }
+    // Handle multi-word blocked commands like "apt purge", "apt remove"
+    // Check if the command matches the first word and the first arg matches the rest
+    const blockedParts = blockedLower.split(' ');
+    if (blockedParts.length > 1) {
+      if (cmd === blockedParts[0] && args.length > 0 && args[0].toLowerCase() === blockedParts[1]) {
+        return true;
+      }
+    }
+    // Handle commands like "mkfs.ext4" where "mkfs" is blocked
+    // Check if the blocked command is a prefix of the base command (e.g., "mkfs" matches "mkfs.ext4")
+    if (blockedLower.length > 2 && cmd.startsWith(blockedLower)) {
+      // Make sure it's a real prefix (e.g., "mkfs" not "mkf")
+      const nextChar = cmd.charAt(blockedLower.length);
+      if (!nextChar || nextChar === '.' || nextChar === '/' || nextChar === ' ' || nextChar === '-') {
+        return true;
+      }
+    }
   }
   return false;
 }
@@ -145,12 +172,18 @@ function isCommandBlocked(baseCommand: string): boolean {
 /**
  * Check if a base command matches a dangerous pattern
  */
-function isCommandDangerous(baseCommand: string): boolean {
+function isCommandDangerous(baseCommand: string, fullCommand: string): boolean {
   const cmd = baseCommand.toLowerCase();
+  const fullCmd = fullCommand.toLowerCase();
 
   for (const pattern of DANGEROUS_PATTERNS) {
     const patternLower = pattern.toLowerCase();
+    // Check base command exact/prefix match
     if (cmd === patternLower || cmd.startsWith(patternLower + ' ') || cmd.startsWith(patternLower + '/')) {
+      return true;
+    }
+    // Also check full command for multi-word patterns like "chmod -R"
+    if (patternLower.includes(' ') && fullCmd.includes(patternLower)) {
       return true;
     }
   }
@@ -172,14 +205,14 @@ export function isBlockedCommand(command: string): boolean {
       const trimmed = part.trim();
       if (!trimmed) continue;
       const subParsed = parseShellCommand(trimmed);
-      if (isCommandBlocked(subParsed.baseCommand)) {
+      if (isCommandBlocked(subParsed.baseCommand, subParsed.args)) {
         return true;
       }
     }
     return false;
   }
 
-  return isCommandBlocked(parsed.baseCommand);
+  return isCommandBlocked(parsed.baseCommand, parsed.args);
 }
 
 /**
@@ -196,13 +229,13 @@ export function isDangerousCommand(command: string): boolean {
       const trimmed = part.trim();
       if (!trimmed) continue;
       const subParsed = parseShellCommand(trimmed);
-      if (isCommandDangerous(subParsed.baseCommand)) {
+      if (isCommandDangerous(subParsed.baseCommand, trimmed)) {
         return true;
       }
     }
   }
 
-  if (isCommandDangerous(parsed.baseCommand)) {
+  if (isCommandDangerous(parsed.baseCommand, command)) {
     return true;
   }
 

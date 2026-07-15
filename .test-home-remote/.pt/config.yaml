@@ -1,0 +1,10 @@
+version: "3.0"
+templates: {}
+security:
+  trustedSources:
+    - github.com/trusted-user
+    - gitea.company.com/team
+  maxExecutionTime: 30000
+  enableAuditLogging: true
+  maxCommandsPerRun: 50
+  securityLevel: warn

@@ -160,8 +160,8 @@ security:
 
 ### Security Levels
 
-- **`warn`** (default): Warning-based approach with cancellation prompts
-- **`strict`**: More conservative defaults, enabled by default for new installations
+- **`warn`** (default): Warning-based approach with cancellation prompts for dangerous commands
+- **`strict`**: More conservative defaults
 
 ### Trusted Sources
 
@@ -169,20 +169,65 @@ When downloading templates from remote URLs, `pt-cli` verifies the source agains
 
 ### Command Security
 
-- **Absolute blocks**: Commands like `sudo`, `rm -rf`, `dd` are always blocked
-- **Dangerous commands**: Commands like `curl`, `python`, `chmod` trigger warnings
-- **Rate limiting**: 50 commands per run prevents runaway execution
-- **Execution timeout**: 30 seconds per command prevents hung processes
+#### Absolute Blocks (Never Allowed)
+
+The following commands are **always blocked** regardless of security level. The blocklist uses **proper shell parsing** — commands are split by shell metacharacters (`;`, `&`, `|`, `&&`, `||`, etc.), quoted strings are respected, and each sub-command is checked individually. This prevents bypasses like `"sudo" rm -rf /`, `sudo; rm -rf /`, or `mkfs.ext4`.
+
+**Privilege Escalation:** `sudo`, `su`, `su -`, `su root`
+
+**Disk Operations:** `dd`, `mkfs` (and variants like `mkfs.ext4`, `mkfs.xfs`), `fdisk`, `mount`, `umount`
+
+**Dangerous Permissions:** `chmod 777`, `chmod -R 777`, `chmod 666`
+
+**Process Killing:** `kill`, `killall`, `pkill`, `fuser`
+
+**Network Exfiltration:** `nc`, `netcat`, `socat`
+
+**Package Manager (Destructive Operations):** `apt purge`, `apt remove`, `apt-get purge`, `apt-get remove`, `yum remove`, `brew uninstall`
+
+#### Dangerous Commands (Warning + 5-Second Countdown)
+
+The following commands trigger a **5-second countdown** with CTRL+C cancellation. These are allowed but require explicit user confirmation.
+
+**Remote Downloads + Execution:** `curl`, `wget`, `wget -O`, `curl |`, `wget |`
+
+**Script Execution:** `bash`, `sh`, `python`, `python3`, `python2`, `python3.10`, `python3.11`, `python3.12`, `node`, `node -e`, `node -p`, `npm run`, `npx`
+
+**Shell Operations:** `eval`, `exec`, `source`, `.`
+
+**Recursive File Operations:** `chmod -R`, `chown -R`, `chgrp -R`
+
+**PowerShell (Windows):** `powershell`, `pwsh`, `Invoke-Expression`, `IEX`
+
+**macOS-Specific:** `diskutil`, `hdiutil`, `csrutil`
+
+**Destructive File Operations on Absolute Paths:** `rm`, `rmdir`, `del` followed by absolute paths (e.g., `rm -rf /tmp`, `rm /etc/passwd`)
+
+### Rate Limiting
+
+- **50 commands per run**: Prevents runaway command execution (in-memory only, resets each `pt init` session)
+
+### Execution Timeout
+
+- **30 seconds per command**: Prevents hung processes
 
 ### Audit Logging
 
-All security events are logged to `~/.pt/security-audit.log` for monitoring and troubleshooting.
+All security events are logged to `~/.pt/security-audit.log` in JSON format with event types: `command_executed`, `command_blocked`, `command_timed_out`, `template_loaded` and results: `success`, `failed`, `timedout`, `blocked`.
 
-## Security Testing
+### Bypass Protection
+
+The parser specifically handles these common bypass attempts:
+- Quoted commands: `"sudo" rm -rf /` → detected (quotes stripped)
+- Chained commands: `echo hello; sudo rm -rf /` → detected via metacharacter split
+- Pipeline injection: `curl | bash` → detected as dangerous pattern
+- Multi-word commands: `apt remove`, `mkfs.ext4`, `chmod -R` → properly matched
+
+### Security Testing
 
 Security features can be tested by:
 
-1. **Testing command blocks**: Try running templates with dangerous commands like `sudo rm -rf` or `dd`
+1. **Testing command blocks**: Try running templates with dangerous commands like `sudo rm -rf /` or `dd`
 2. **Testing remote downloads**: Use untrusted URLs to verify source verification
 3. **Testing rate limiting**: Execute more than 50 commands in a single init session
 4. **Testing timeouts**: Run commands that hang to verify timeout behavior

@@ -326,29 +326,29 @@ export async function init(targetName: string | undefined, destPath: string | un
     }
     // Determine which tasks to include
     let selectedTaskNames: string[] = [];
-    
+
     if (options.skipPostConfig) {
       // Skip entirely
       selectedTaskNames = [];
     } else if (options.dryRun) {
       // In dry-run, select all (for display)
-      selectedTaskNames = allTasks.map(t => t.command || t.script || '');
+      selectedTaskNames = allTasks.map(t => t.command || `./${t.script}` || '');
       console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
       for (const t of allTasks) {
         const desc = t.description ? ` (${t.description})` : '';
-        console.log(chalk.gray(`  [template] - ${t.command || t.script}${desc}`));
+        console.log(chalk.gray(`  [template] - ${t.command || `./${t.script}`}${desc}`));
       }
     } else if (options.yes) {
       // All tasks selected
-      selectedTaskNames = allTasks.map(t => t.command || t.script || '');
+      selectedTaskNames = allTasks.map(t => t.command || `./${t.script}` || '');
     } else if (allTasks.length === 0) {
       selectedTaskNames = [];
     } else {
       // Checkbox prompt
       const choices: Array<{name: string; value: string; checked?: boolean}> = [];
-      
+
       for (const t of allTasks) {
-        const cmd = t.command || t.script || '(no command)';
+        const cmd = t.command || `./${t.script}` || '(no command)';
         const desc = t.description ? ` (${t.description})` : '';
         choices.push({
           name: `${cmd}${desc}`,
@@ -356,7 +356,7 @@ export async function init(targetName: string | undefined, destPath: string | un
           checked: true
         });
       }
-      
+
       const response = await inquirer.prompt({
         type: 'checkbox',
         name: 'selected',
@@ -373,7 +373,7 @@ export async function init(targetName: string | undefined, destPath: string | un
       selectedTaskNames = response.selected || [];
     }
     
-   // Write post_config scripts for selected tasks
+    // Write post_config scripts for selected tasks
     if (selectedTaskNames.length > 0 && !options.dryRun) {
       let bashContent = '#!/bin/bash\n# Auto-generated post_config script\n\n';
       let batContent = '@echo off\n:: Auto-generated post_config script\n\n';

@@ -13,8 +13,6 @@ const BLOCKED_COMMANDS = [
   'sudo', 'su', 'su -', 'su root',
   // Disk operations that could destroy data
   'dd', 'mkfs', 'fdisk', 'mount', 'umount',
-  // Shell injection patterns - removed from blocklist to allow command chaining.
-  // These are validated as warnings instead.
   // Dangerous chmod
   'chmod 777', 'chmod -R 777', 'chmod 666',
   // System commands that could kill processes
@@ -42,35 +40,102 @@ const DANGEROUS_PATTERNS = [
   'diskutil', 'hdiutil', 'csrutil',
 ];
 
-// === DEFAULT CONFIGURATION ===
-export interface SecurityPolicy {
-  maxExecutionTime: number; // milliseconds
-  enableAuditLogging: boolean;
-  trustedSources: string[];
-  maxCommandsPerRun: number;
-  securityLevel: 'warn' | 'strict';
-}
-
-// Default security policy - warning focused
-const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
-  maxExecutionTime: 30000, // 30 seconds
-  enableAuditLogging: true,
-  trustedSources: [
-    'github.com/garyritchie',
-    'git.lyonritchie.com',
-    'github.com/lyonritchie',
-  ],
-  maxCommandsPerRun: 50,
-  securityLevel: 'warn', // Warning-focused mode
-};
+// Shell metacharacters that indicate command chaining/injection attempts
+const SHELL_METACHARACTERS = [';', '|', '&', '||', '&&', '|&', '<', '>', '>>', '$(', '`'];
 
 /**
- * Check if a command is in the blocklist (NEVER allowed)
- * Only truly dangerous operations that could destroy data
+ * Parse a shell command into its base command and arguments, handling basic shell syntax.
+ * This is a simplified parser that splits by shell metacharacters and parses the first command.
  */
-export function isBlockedCommand(command: string): boolean {
+function parseShellCommand(command: string): { baseCommand: string; args: string[]; hasMetacharacters: boolean } {
+  // Check for shell metacharacters that could chain commands
+  let hasMetacharacters = false;
+  for (const char of SHELL_METACHARACTERS) {
+    if (command.includes(char)) {
+      hasMetacharacters = true;
+      break;
+    }
+  }
+
+  // Simple approach: split by whitespace, but respect quoted strings
+  const parts: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+
+    if (escapeNext) {
+      current += char;
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\' && !inSingleQuote) {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      current += char;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      current += char;
+      continue;
+    }
+
+    if ((char === ' ' || char === '\t') && !inSingleQuote && !inDoubleQuote) {
+      if (current) {
+        parts.push(current);
+        current = '';
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current) {
+    parts.push(current);
+  }
+
+  if (parts.length === 0) {
+    return { baseCommand: '', args: [], hasMetacharacters };
+  }
+
+  // Find the first actual command (skip environment variable assignments like VAR=value)
+  let commandIndex = 0;
+  while (commandIndex < parts.length && parts[commandIndex].includes('=') && !parts[commandIndex].startsWith('-')) {
+    commandIndex++;
+  }
+
+  if (commandIndex >= parts.length) {
+    return { baseCommand: '', args: [], hasMetacharacters };
+  }
+
+  const baseCommand = parts[commandIndex];
+  const args = parts.slice(commandIndex + 1);
+
+  return { baseCommand, args, hasMetacharacters };
+}
+
+/**
+ * Check if a base command matches a blocked command (exact or prefix match)
+ */
+function isCommandBlocked(baseCommand: string): boolean {
+  // Normalize the command (resolve path if needed)
+  const cmd = baseCommand.toLowerCase();
+
   for (const blocked of BLOCKED_COMMANDS) {
-    if (command.includes(blocked)) {
+    const blockedLower = blocked.toLowerCase();
+    // Exact match or prefix match (e.g., "sudo" blocks "sudo rm -rf")
+    if (cmd === blockedLower || cmd.startsWith(blockedLower + ' ') || cmd.startsWith(blockedLower + '/')) {
       return true;
     }
   }
@@ -78,37 +143,103 @@ export function isBlockedCommand(command: string): boolean {
 }
 
 /**
+ * Check if a base command matches a dangerous pattern
+ */
+function isCommandDangerous(baseCommand: string): boolean {
+  const cmd = baseCommand.toLowerCase();
+
+  for (const pattern of DANGEROUS_PATTERNS) {
+    const patternLower = pattern.toLowerCase();
+    if (cmd === patternLower || cmd.startsWith(patternLower + ' ') || cmd.startsWith(patternLower + '/')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if a command is in the blocklist (NEVER allowed)
+ * Uses proper shell parsing to prevent bypasses like "sud o" or "curl|sh"
+ */
+export function isBlockedCommand(command: string): boolean {
+  const parsed = parseShellCommand(command);
+
+  // Check each command in a chained command sequence
+  if (parsed.hasMetacharacters) {
+    // Split by metacharacters and check each command
+    const parts = command.split(/[;&|]|&&|\|\|/);
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const subParsed = parseShellCommand(trimmed);
+      if (isCommandBlocked(subParsed.baseCommand)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  return isCommandBlocked(parsed.baseCommand);
+}
+
+/**
  * Check if a command should trigger a warning (but is allowed)
+ * Uses proper shell parsing to prevent bypasses
  */
 export function isDangerousCommand(command: string): boolean {
-  // Check for destructive file operations targeting absolute paths
-  // Regex matches 'rm', 'rmdir', or Windows 'del' followed by optional flags and then an absolute path.
-  // Absolute path matches:
-  // - Unix: starting with '/' (e.g. /tmp, /usr)
-  // - Windows: starting with drive letter (e.g. C:\) or UNC path (\\) or drive-relative '\'
-  const parts = command.split(/\s+/);
-  const rmIndex = parts.findIndex(p => p === 'rm' || p === 'rmdir' || p === 'del');
-  if (rmIndex !== -1) {
-    // Check subsequent arguments
-    for (let i = rmIndex + 1; i < parts.length; i++) {
-      const arg = parts[i];
-      if (!arg) continue;
-      // Skip flags (starting with - or /flag on Windows)
-      if (arg.startsWith('-') || (process.platform === 'win32' && arg.startsWith('/'))) {
-        continue;
-      }
-      // Check absolute path patterns
-      const isAbsolute = arg.startsWith('/') || 
-                         (process.platform === 'win32' && (/^[a-zA-Z]:\\/.test(arg) || arg.startsWith('\\\\') || arg.startsWith('\\')));
-      if (isAbsolute) {
+  const parsed = parseShellCommand(command);
+
+  // Check each command in a chained sequence
+  if (parsed.hasMetacharacters) {
+    const parts = command.split(/[;&|]|&&|\|\|/);
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      const subParsed = parseShellCommand(trimmed);
+      if (isCommandDangerous(subParsed.baseCommand)) {
         return true;
       }
     }
   }
 
-  for (const pattern of DANGEROUS_PATTERNS) {
-    if (command.includes(pattern)) {
-      return true;
+  if (isCommandDangerous(parsed.baseCommand)) {
+    return true;
+  }
+
+  // Check for destructive file operations targeting absolute paths
+  return checkDestructiveAbsolutePath(command);
+}
+
+/**
+ * Check for 'rm', 'rmdir', 'del' followed by absolute paths
+ */
+function checkDestructiveAbsolutePath(command: string): boolean {
+  // Split by shell metacharacters to check each command separately
+  const parts = command.split(/[;&|]|&&|\|\|/);
+  
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    
+    const parsed = parseShellCommand(trimmed);
+    const baseCmd = parsed.baseCommand.toLowerCase();
+    
+    if (baseCmd === 'rm' || baseCmd === 'rmdir' || baseCmd === 'del') {
+      // Check arguments for absolute paths
+      for (const arg of parsed.args) {
+        if (!arg) continue;
+        // Skip flags
+        if (arg.startsWith('-') || (process.platform === 'win32' && arg.startsWith('/'))) {
+          continue;
+        }
+        // Check absolute path patterns
+        const isAbsolute = arg.startsWith('/') || 
+                           (process.platform === 'win32' && 
+                            (/^[a-zA-Z]:\\/.test(arg) || arg.startsWith('\\\\') || arg.startsWith('\\')));
+        if (isAbsolute) {
+          return true;
+        }
+      }
     }
   }
   return false;
@@ -218,6 +349,28 @@ export function resetExecutionCounts(): void {
   lastExecutionTimes.clear();
 }
 
+// === DEFAULT CONFIGURATION ===
+export interface SecurityPolicy {
+  maxExecutionTime: number; // milliseconds
+  enableAuditLogging: boolean;
+  trustedSources: string[];
+  maxCommandsPerRun: number;
+  securityLevel: 'warn' | 'strict';
+}
+
+// Default security policy - warning focused
+const DEFAULT_SECURITY_POLICY: SecurityPolicy = {
+  maxExecutionTime: 30000, // 30 seconds
+  enableAuditLogging: true,
+  trustedSources: [
+    'github.com/garyritchie',
+    'git.lyonritchie.com',
+    'github.com/lyonritchie',
+  ],
+  maxCommandsPerRun: 50,
+  securityLevel: 'warn', // Warning-focused mode
+};
+
 /**
  * Validate a template's security before execution
  */
@@ -318,13 +471,13 @@ export async function showDangerousCommandWarning(command: string, timeoutSecond
 export async function handleSecurityResponse(response: string): Promise<boolean> {
   // Normalize response
   const normalized = response.trim().toLowerCase();
-  
+
   // Accept 'y' or 'yes' as positive response
   if (normalized === 'y' || normalized === 'yes') {
     console.log('Security response: ALLOWED');
     return true;
   }
-  
+
   // Reject any other response
   console.log('Security response: DENIED');
   return false;

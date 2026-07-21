@@ -174,6 +174,19 @@ export function normalizeVariable(v: TemplateVariable): TemplateVariable {
   return result;
 }
 
+export function normalizeFolders(folders: FolderNode[]): FolderNode[] {
+  return folders.map(folder => {
+    const normalized: FolderNode = { name: folder.name, info: folder.info || '' };
+    if (folder.children !== undefined && folder.children.length > 0) {
+      normalized.children = normalizeFolders(folder.children);
+    } else if (folder.children !== undefined) {
+      normalized.children = [];
+    }
+    if (folder.is_file !== undefined) normalized.is_file = folder.is_file;
+    return normalized;
+  });
+}
+
 export function saveConfig(config: PtConfig) {
   ensureConfigDir();
 
@@ -187,6 +200,20 @@ export function saveConfig(config: PtConfig) {
       if (template.variables && Array.isArray(template.variables)) {
         template.variables = template.variables.map(normalizeVariable);
       }
+      if (template.folders && Array.isArray(template.folders)) {
+        template.folders = normalizeFolders(template.folders);
+      }
+      // Create a new object with keys in the desired order for consistent YAML output
+      const orderedTemplate: Partial<TemplateConfig> = {};
+      if (template.description !== undefined) orderedTemplate.description = template.description;
+      if (template.templateRoot !== undefined) orderedTemplate.templateRoot = template.templateRoot;
+      if (template.variables !== undefined) orderedTemplate.variables = template.variables;
+      if (template.folders !== undefined) orderedTemplate.folders = template.folders;
+      if (template.exclude !== undefined) orderedTemplate.exclude = template.exclude;
+      if (template.copy_files !== undefined) orderedTemplate.copy_files = template.copy_files;
+      if (template.post_copy !== undefined) orderedTemplate.post_copy = template.post_copy;
+      if (template.post_config !== undefined) orderedTemplate.post_config = template.post_config;
+      config.templates[key] = orderedTemplate as TemplateConfig;
     }
   }
 

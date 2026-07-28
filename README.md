@@ -67,7 +67,9 @@ Standardization is key to lowering the friction of starting new work. By ensurin
 
 ### 📦 Sharing is Caring
 
-Templates can be exported as plain-text JSON files (`.pt-template.json`). This makes them completely self-describing, easy to share with your team, version control, or pull directly from remote repositories without vendor lock-in.
+Templates can be exported as JSON configuration files via `pt config <name> --json > .pt-template.json`. This exports the template's structure (folders, files to copy), variables, and post-config tasks — but *not* the actual file contents.
+
+For fully self-contained distribution, commit the template's source directory alongside its JSON config.
 
 ### 🤖 Agentic and API Friendly
 

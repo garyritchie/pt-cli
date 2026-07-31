@@ -281,17 +281,12 @@ export function getSecurityPolicy(config: PtConfig): SecurityPolicy {
 // Default exclusions for template scanning
 export const DEFAULT_EXCLUDES = [
   '.git',
-  '.gitea',
-  '.vscode',
   'node_modules',
   'dist',
   'build',
   'bin',
   '.DS_Store',
   'Thumbs.db',
-  '.stignore',
-  '.stfolder',
-  '.stversions',
 ];
 
 // Check if a path should be excluded
@@ -397,22 +392,10 @@ export function shouldExcludeFile(fileName: string): boolean {
     '*.swo',
     '*~',
     '.bak',
-    '*.md',
-    '*.txt',
-    '*.json',
-    '*.yaml',
-    '*.yml',
-    '*.ini',
-    '*.conf',
-    '*.config',
-    '.gitconfig',
-    '.makerc',
     'Gemfile.lock',
-    'package.json',
     'package-lock.json',
     'yarn.lock',
     'pnpm-lock.yaml',
-    'composer.json',
     'composer.lock',
   ];
 

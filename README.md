@@ -158,3 +158,100 @@ Because `pt-cli` is built around flexibility, the app purposefully avoids imposi
 
 * **[Example Templates](https://github.com/search?q=topic%3Atemplate-project+org%3Agaryritchie&type=Repositories):** We have provided a few templates based on our own workflows to get you started. These include helpful Python scripts for streamlining common tasks, such as downloading the latest version of Blender or pruning unused folders from a project.
 * **[Share Your Own](https://github.com/garyritchie/pt-cli/discussions):** Have you built a project structure that works perfectly for your niche? Join us in GitHub Discussions to share your templates and see how others are organizing their work.
+
+## 1.0 Release & API Stability
+
+**pt-cli v1.0.0** marks the first stable release with a locked public API. This means:
+
+### 🔒 Stability Guarantee (1.x series)
+
+- **No breaking changes** to CLI command signatures, flags, or config schema (`~/.pt/config.yaml`) within the 1.x series
+- **No breaking changes** to the JSON template format (`.pt-template.json` / `template.json`)
+- **No breaking changes** to the Node.js programmatic API (if used as a library)
+
+### 📦 Versioning Policy
+
+| Version | Meaning |
+|---------|---------|
+| **MAJOR** (1.0 → 2.0) | Breaking changes to CLI, config schema, or JSON template format |
+| **MINOR** (1.0 → 1.1) | New features, commands, or config options (backward compatible) |
+| **PATCH** (1.0 → 1.0.1) | Bug fixes, security patches, documentation updates |
+
+### 📋 What's Locked in 1.0
+
+**CLI Commands & Flags:**
+```bash
+pt learn [path] [--ignore] [--name] [--desc] [--yes] [--json] [--allow-untrusted] [--no-diff]
+pt init [template] [dest] [--file] [--skip-post-config] [--dry-run] [--yes] [--vars]
+pt update <template> [path] [--ignore] [--desc] [--yes] [--no-diff]
+pt config [template] [--json]
+pt add <name> [--file] [json]
+pt remove <template> [--yes]        # alias: pt rm
+pt variables [--set] [--delete] [--json]
+pt default-post-config [--set --json]
+pt ignore [patterns] [--set]
+pt security-response <response>
+```
+
+**Config Schema (`~/.pt/config.yaml` v3.0):**
+```yaml
+version: "3.0"
+templates: { <name>: TemplateConfig }
+default_post_config: PostConfigTask[]
+ignore: string[]
+variables: TemplateVariable[]
+security: SecurityPolicy  # optional
+```
+
+**TemplateConfig (per-template):**
+```yaml
+description: string
+templateRoot?: string
+variables?: TemplateVariable[]
+folders: FolderNode[]
+exclude?: string[]
+copy_files?: CopyFileEntry[]
+post_copy?: PostCopyFile[]
+post_config?: PostConfigTask[]
+```
+
+**JSON Template Format (`.pt-template.json`):**
+```json
+{
+  "name": "template-name",
+  "description": "Template description",
+  "variables": [{ "name": "", "prompt": "", "default": "", "required": false }],
+  "folders": [{ "name": "", "info": "", "children": [] }],
+  "copy_files": [{ "src": "", "dest": "", "substitute_variables": false, "chmod": "" }],
+  "post_config": [{ "command": "", "description": "", "type": "", "always_prompt": false, "script": "", "cross_platform": false, "checked": true }],
+  "post_copy": [{ "src": "", "dest": "" }]
+}
+```
+
+### 📖 Migration from 0.x to 1.0
+
+If you're upgrading from a 0.x version:
+
+1. **Config auto-migrates** — `pt` automatically upgrades your `~/.pt/config.yaml` from v2.0 → v3.0 on first run (renames `name` → `description`, removes `type`, migrates `global_post_config` → `default_post_config`, normalizes variables)
+2. **No action needed** — Just run any `pt` command; migration happens silently with a backup (`.bak`) created
+3. **CLI flags unchanged** — All 0.x flags work identically in 1.0
+
+**Breaking changes from 0.x already landed in 0.30+:**
+- Config version 3.0 (v0.30+)
+- `default_post_config` replaces `global_post_config` (v0.30+)
+- Additive diff mode for `pt update` (v0.38+)
+- Nested variable expansion (v0.36+)
+- `.env` file scanning for defaults (v0.36+)
+
+If you skipped intermediate 0.x versions, the auto-migration handles everything.
+
+---
+
+## Documentation
+
+* **[Detailed Usage](doc/usage.md)** - Learn, Initialize, Update, and Remove commands.
+* **[Configuration Guide](doc/configuration.md)** - Template variables, post-config tasks, file copying, and more.
+* **[Security Guide](doc/security.md)** - Command validation, trusted sources, audit logging.
+* **[Testing Guide](doc/testing.md)** - Test suite structure and running tests.
+* **[Exclusions Reference](doc/exclusions.md)** - Default ignored files and custom patterns.
+* **[Variable Substitution Example](doc/variable_substitution_example.md)** - Practical examples.

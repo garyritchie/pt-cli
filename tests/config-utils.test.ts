@@ -148,8 +148,10 @@ test('DEFAULT_EXCLUDES contains expected patterns', () => {
   assert.ok(DEFAULT_EXCLUDES.includes('dist'), 'Should include dist');
   assert.ok(DEFAULT_EXCLUDES.includes('build'), 'Should include build');
   assert.ok(DEFAULT_EXCLUDES.includes('.DS_Store'), 'Should include .DS_Store');
-  assert.ok(DEFAULT_EXCLUDES.includes('.vscode'), 'Should include .vscode');
   assert.ok(DEFAULT_EXCLUDES.includes('Thumbs.db'), 'Should include Thumbs.db');
+  assert.ok(!DEFAULT_EXCLUDES.includes('.vscode'), 'Should NOT include .vscode');
+  assert.ok(!DEFAULT_EXCLUDES.includes('.gitea'), 'Should NOT include .gitea');
+  assert.ok(!DEFAULT_EXCLUDES.includes('.stignore'), 'Should NOT include .stignore');
 });
 
 // ─── shouldExclude ───────────────────────────────────────────────────────────
@@ -357,14 +359,6 @@ test('shouldExcludeFile excludes wildcard extension patterns', () => {
     'file.swp',
     'file.swo',
     'backup~',
-    'readme.md',
-    'notes.txt',
-    'data.json',
-    'config.yaml',
-    'settings.yml',
-    'setup.ini',
-    'app.conf',
-    'lint.config',
   ];
 
   for (const file of wildcardExcludes) {
@@ -379,14 +373,10 @@ test('shouldExcludeFile excludes exact match files', () => {
   const exactExcludes = [
     '.Python',
     '.bak',
-    '.gitconfig',
-    '.makerc',
     'Gemfile.lock',
-    'package.json',
     'package-lock.json',
     'yarn.lock',
     'pnpm-lock.yaml',
-    'composer.json',
     'composer.lock',
   ];
 
@@ -415,6 +405,18 @@ test('shouldExcludeFile does NOT exclude normal source files', () => {
     'Component.jsx',
     'handler.py',
     'server.rb',
+    'readme.md',
+    'notes.txt',
+    'data.json',
+    'config.yaml',
+    'settings.yml',
+    'setup.ini',
+    'app.conf',
+    'lint.config',
+    '.gitconfig',
+    '.makerc',
+    'package.json',
+    'composer.json',
   ];
 
   for (const file of normalFiles) {

@@ -27,7 +27,7 @@ templates:
 ```
 
 > [!TIP]
-> **New in v0.16.0:** You no longer need to manually define the `variables` section. During `pt learn` or `pt update`, the tool will automatically detect `{{ variable_name }}` placeholders in your files and add them to the configuration for you.
+> **Automatic detection (v0.16+):** You no longer need to manually define the `variables` section. During `pt learn` or `pt update`, the tool will automatically detect `{{ variable_name }}` placeholders in your files and add them to the configuration for you.
 
 ## 2. Create Template Files
 
@@ -140,3 +140,13 @@ project=wiki
 Result: `template_path` becomes `docs/wiki`
 
 **Important:** Missing nested variables remain as `{{ variable }}` placeholders (with preserved whitespace) to help identify configuration issues.
+
+## 5. CLI Variable Overrides
+
+Pass variables non-interactively with `--vars`:
+
+```bash
+pt init node_web_app my-project --yes --vars project_name=my-service,author_name="Jane Doe"
+```
+
+Or use a `.env` file in the destination directory for persistent defaults.

@@ -42,6 +42,7 @@ graph LR
     - [Quick Start](#quick-start)
         - [Installation](#installation)
         - [Basic Commands](#basic-commands)
+        - [Shell Completions](#shell-completions)
     - [Agent Integration](#agent-integration)
     - [Documentation](#documentation)
     - [Development](#development)
@@ -124,6 +125,25 @@ pt init ./new-project --file my-template.json --yes
 
 ```
 
+### Shell Completions
+
+Generate and install tab completions:
+
+```bash
+# Bash
+pt completion bash > /etc/bash_completion.d/pt
+# Or user-local: pt completion bash > ~/.local/share/bash-completion/completions/pt
+
+# Zsh
+pt completion zsh > ~/.zsh/completions/_pt
+# Add to ~/.zshrc: fpath=(~/.zsh/completions $fpath)
+
+# Fish
+pt completion fish > ~/.config/fish/completions/pt.fish
+```
+
+Template names auto-complete dynamically for `pt init`, `pt update`, `pt config`, and `pt remove`.
+
 ## Agent Integration
 
 `pt-cli` is fully compatible with AI agents. By utilizing non-interactive flags (`--yes`, `--vars`, `--name`, `--desc`), agents can autonomously scaffold and learn projects without hanging on interactive terminal prompts.
@@ -191,6 +211,7 @@ pt variables [--set] [--delete] [--json]
 pt default-post-config [--set --json]
 pt ignore [patterns] [--set]
 pt security-response <response>
+pt completion <shell>
 ```
 
 **Config Schema (`~/.pt/config.yaml` v3.0):**

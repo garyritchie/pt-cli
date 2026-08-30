@@ -16,6 +16,7 @@ import { addCommand } from './commands/addCommand.js';
 import { removeCommand } from './commands/removeCommand.js';
 import { defaultPostConfigCommand } from './commands/defaultPostConfigCommand.js';
 import { securityResponseCommand } from './commands/securityResponseCommand.js';
+import { completionCommand } from './commands/completionCommand.js';
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -127,6 +128,14 @@ program
   .description('Handle security response from GUI')
   .action(async (response: string) => {
     await securityResponseCommand(response);
+  });
+
+program
+  .command('completion [shell]')
+  .description('Generate shell completion script')
+  .option('--templates', 'Internal helper to list template names for completion')
+  .action(async (shellArg: string | undefined, options) => {
+    await completionCommand(shellArg, options);
   });
 
 program.parse(process.argv);

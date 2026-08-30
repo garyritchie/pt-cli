@@ -305,3 +305,41 @@ To see your entire configuration (including all templates) in JSON format:
 ```bash
 pt config --json
 ```
+
+## Shell Completions
+
+`pt` can generate tab-completion scripts for Bash, Zsh, and Fish shells.
+
+### Installation
+
+#### Bash
+
+```bash
+pt completion bash > /etc/bash_completion.d/pt
+# Or user-local:
+pt completion bash > ~/.local/share/bash-completion/completions/pt
+```
+
+#### Zsh
+
+```bash
+pt completion zsh > ~/.zsh/completions/_pt
+# Add to ~/.zshrc:
+# fpath=(~/.zsh/completions $fpath)
+# autoload -U compinit && compinit
+```
+
+#### Fish
+
+```bash
+pt completion fish > ~/.config/fish/completions/pt.fish
+```
+
+### Dynamic Completion
+
+Template names auto-complete dynamically from your local `~/.pt/config.yaml` for:
+- `pt init <TAB>`
+- `pt update <TAB>`
+- `pt config <TAB>`
+- `pt remove <TAB>` (and `pt rm <TAB>`)
+

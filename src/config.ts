@@ -285,6 +285,7 @@ export const DEFAULT_EXCLUDES = [
   'dist',
   'build',
   'bin',
+  '.vscode',
   '.DS_Store',
   'Thumbs.db',
 ];
@@ -397,6 +398,8 @@ export function shouldExcludeFile(fileName: string): boolean {
     'yarn.lock',
     'pnpm-lock.yaml',
     'composer.lock',
+    'post_config.sh',
+    'post_config.bat',
   ];
 
   for (const pattern of excludePatterns) {

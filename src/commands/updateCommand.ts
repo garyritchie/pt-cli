@@ -170,6 +170,7 @@ export async function update(sourcePath: string, templateName: string, options: 
   if (!isFullMode) {
     // Additive mode: only present new variables for selection
     const existingVarNames = new Set(config.templates[templateName].variables?.map(v => v.name) || []);
+    // newVars are NOT added to variables yet - only existing variables + JSON variables are in variables
     const newVars = variables.filter(v => !existingVarNames.has(v.name));
     
     if (newVars.length > 0) {
@@ -177,6 +178,7 @@ export async function update(sourcePath: string, templateName: string, options: 
       console.log(chalk.green(`  + ${newVars.length} new variable(s): ${newVars.map(v => v.name).join(', ')}`));
       
       const selectedNewVars = await promptNewVariables(newVars, options);
+      // Only add the selected new variables (not all newVars)
       variables.push(...selectedNewVars);
     } else {
       printNoNewVariables();
@@ -197,106 +199,119 @@ export async function update(sourcePath: string, templateName: string, options: 
       variables.push(...selectedGlobals);
     }
   } else {
-    // Full mode: original behavior with optional default/global variables prompt
-    const globalVarsToPrompt: TemplateVariable[] = [];
-    if (config.variables && Array.isArray(config.variables)) {
-      for (const v of config.variables) {
-        if (!variables.some(existing => existing.name === v.name)) {
-          globalVarsToPrompt.push({ ...v });
+    // Full mode: replace all variables with detected ones (no additive)
+    variables = [];
+    // Add detected variables
+    for (const varName of detectedVars) {
+      variables.push({
+        name: varName,
+        prompt: `Enter ${varName}:`,
+        required: true
+      });
+    }
+    // Also include JSON variables
+    if (fileTemplateConfig.variables && Array.isArray(fileTemplateConfig.variables)) {
+      for (const v of fileTemplateConfig.variables) {
+        const existingIndex = variables.findIndex(existing => existing.name === v.name);
+        if (existingIndex !== -1) {
+          variables[existingIndex] = { ...variables[existingIndex], ...v };
+        } else {
+          variables.push({ ...v });
         }
       }
     }
-
-    if (globalVarsToPrompt.length > 0) {
-      const selectedGlobals = await promptGlobalVariables(globalVarsToPrompt, options);
-      variables.push(...selectedGlobals);
-    }
-
-    const additionalVars = await promptAdditionalVariables(variables, options);
-    variables.push(...additionalVars);
   }
 
   // 1. Structure (skeleton) - Additive mode
-  let folders: FolderNode[] = [];
-  if (!isFullMode) {
-    // Additive mode: only add new folders
-    const detectedFolders = fileTemplateConfig.folders && Array.isArray(fileTemplateConfig.folders)
-      ? fileTemplateConfig.folders
-      : extractStructure(resolvedPath, resolvedPath, ignorePatterns);
-
-    const existingFolders = config.templates[templateName].folders || [];
-    const newFolders = detectedFolders.filter(f => !existingFolders.some(ef => ef.name === f.name));
-    
-    if (newFolders.length > 0) {
-      console.log(chalk.cyan(`\n📊 New Folders:`));
-      console.log(chalk.green(`  + ${newFolders.length} new folder(s): ${newFolders.map(f => f.name).join(', ')}`));
-      
-      const addedFolders = await promptNewFolders(newFolders, options);
-      folders = [...existingFolders, ...addedFolders];
-    } else {
-      printNoNewFolders();
-      folders = existingFolders;
-    }
-  } else {
-    // Full mode: original behavior
-    folders = fileTemplateConfig.folders && Array.isArray(fileTemplateConfig.folders)
-      ? fileTemplateConfig.folders
-      : extractStructure(resolvedPath, resolvedPath, ignorePatterns);
-  }
-
-  // 2. Content Selection (Root only)
-  const rootEntries = fs.readdirSync(resolvedPath, { withFileTypes: true })
-    .filter(e => !shouldExclude(resolvedPath, path.join(resolvedPath, e.name), ignorePatterns))
-    .filter(e => !shouldIgnore(e.name, e.name, ignorePatterns));
-
-  const rootFiles = rootEntries.filter(e => e.isFile()).map(e => e.name);
-  const rootDirs = rootEntries.filter(e => e.isDirectory()).map(e => e.name);
-
-  let selectedFiles: string[] = [];
-  let selectedFolders: string[] = [];
-  let selectedStructure: string[] = [];
-
-  if (!isFullMode) {
-    // Additive mode for files and folders
-    const existingCopyFiles = config.templates[templateName].copy_files || [];
-    
-    // New files
-    const newFiles = rootFiles.filter(f => !existingCopyFiles.some(cf => cf.src === f));
-    printNewFiles(newFiles.length, newFiles);
-    const addedFiles = await promptNewFiles(newFiles, options);
-    selectedFiles = [...existingCopyFiles.filter(cf => !rootDirs.includes(cf.src)).map(cf => cf.src), ...addedFiles];
-
-    // Structure
-    selectedStructure = config.templates[templateName].folders?.map(f => f.name) || [];
-    // Seed selectedFolders from existing copy_files directory entries
-    selectedFolders = existingCopyFiles
-      .filter(f => rootDirs.includes(f.src))
-      .map(f => f.src);
-
-    if (rootDirs.length > 0) {
+    let folders: FolderNode[] = [];
+    let selectedStructure: string[] = [];
+    let selectedFiles: string[] = [];
+    let selectedFolders: string[] = [];
+  
+    if (!isFullMode) {
+      // Additive mode: only add new folders
       const detectedFolders = fileTemplateConfig.folders && Array.isArray(fileTemplateConfig.folders)
         ? fileTemplateConfig.folders
         : extractStructure(resolvedPath, resolvedPath, ignorePatterns);
-      const newFolders = detectedFolders.filter(f => !config.templates[templateName].folders?.some(ef => ef.name === f.name));
-      
-      const addedDirs = newFolders
-        .filter(f => ['APP', 'scripts', 'bin'].some(p => f.name === p))
-        .map(f => f.name);
-      selectedStructure = [...new Set([...selectedStructure, ...addedDirs])];
-      selectedFolders = [...new Set([...selectedFolders, ...addedDirs])];
-    }
-  } else {
-    // Full mode: original behavior
-    if (options.yes || options.json) {
-      selectedFiles = rootFiles.filter(f => ['.makerc', 'readme.md', 'README.md', '.gitattributes', '.gitignore', 'Makefile', 'makefile', 'package.json'].some(p => f.toLowerCase() === p.toLowerCase()));
-      selectedStructure = rootDirs;
-      selectedFolders = rootDirs.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
+
+      const existingFolders = config.templates[templateName].folders || [];
+      const newFolders = detectedFolders.filter(f => !existingFolders.some(ef => ef.name === f.name));
+
+      if (newFolders.length > 0) {
+        console.log(chalk.cyan(`\n📊 New Folders:`));
+        console.log(chalk.green(`  + ${newFolders.length} new folder(s): ${newFolders.map(f => f.name).join(', ')}`));
+
+        const addedFolders = await promptNewFolders(newFolders, options);
+        folders = [...existingFolders, ...addedFolders];
+      } else {
+        printNoNewFolders();
+        folders = existingFolders;
+      }
+
+      // selectedStructure should include ALL folders (existing + added) in additive mode
+      // so that the final filter doesn't drop user-selected new folders
+      selectedStructure = [
+        ...new Set([
+          ...existingFolders.map(f => f.name),
+          ...folders.filter(f => !existingFolders.some(ef => ef.name === f.name)).map(f => f.name),
+        ]),
+      ];
     } else {
-      selectedFiles = await promptRootFiles(rootFiles, undefined, options);
-      selectedStructure = await promptStructureFolders(rootDirs, options);
-      selectedFolders = await promptCopyFolders(selectedStructure, undefined, options);
-    }
-  }
+        // Full mode: original behavior
+        folders = fileTemplateConfig.folders && Array.isArray(fileTemplateConfig.folders)
+          ? fileTemplateConfig.folders
+          : extractStructure(resolvedPath, resolvedPath, ignorePatterns);
+      }
+
+      // 2. Content Selection (Root only)
+      const rootEntries = fs.readdirSync(resolvedPath, { withFileTypes: true })
+        .filter(e => !shouldExclude(resolvedPath, path.join(resolvedPath, e.name), ignorePatterns))
+        .filter(e => !shouldIgnore(e.name, e.name, ignorePatterns));
+
+      const rootFiles = rootEntries.filter(e => e.isFile())
+        .map(e => e.name)
+        .filter(fileName => !shouldExcludeFile(fileName));
+      const rootDirs = rootEntries.filter(e => e.isDirectory()).map(e => e.name);
+
+      if (!isFullMode) {
+        // Additive mode for files and folders
+        const existingCopyFiles = config.templates[templateName].copy_files || [];
+    
+        // New files
+        const newFiles = rootFiles.filter(f => !existingCopyFiles.some(cf => cf.src === f));
+        printNewFiles(newFiles.length, newFiles);
+        const addedFiles = await promptNewFiles(newFiles, options);
+        selectedFiles = [...existingCopyFiles.filter(cf => !rootDirs.includes(cf.src)).map(cf => cf.src), ...addedFiles];
+
+        // Seed selectedFolders from existing copy_files directory entries
+        selectedFolders = existingCopyFiles
+          .filter(f => rootDirs.includes(f.src))
+          .map(f => f.src);
+
+        if (rootDirs.length > 0) {
+          const detectedFolders = fileTemplateConfig.folders && Array.isArray(fileTemplateConfig.folders)
+            ? fileTemplateConfig.folders
+            : extractStructure(resolvedPath, resolvedPath, ignorePatterns);
+          const newFolders = detectedFolders.filter(f => !config.templates[templateName].folders?.some(ef => ef.name === f.name));
+      
+          const addedDirs = newFolders
+            .filter(f => ['APP', 'scripts', 'bin'].some(p => f.name === p))
+            .map(f => f.name);
+          selectedStructure = [...new Set([...selectedStructure, ...addedDirs])];
+          selectedFolders = [...new Set([...selectedFolders, ...addedDirs])];
+        }
+      } else {
+          // Full mode: original behavior - pick up all files like a fresh learn
+          if (options.yes || options.json) {
+            selectedFiles = rootFiles;
+            selectedStructure = rootDirs;
+            selectedFolders = rootDirs.filter(d => ['APP', 'scripts', 'bin'].some(p => d === p));
+          } else {
+            selectedFiles = await promptRootFiles(rootFiles, undefined, options);
+            selectedStructure = await promptStructureFolders(rootDirs, options);
+            selectedFolders = await promptCopyFolders(selectedStructure, undefined, options);
+          }
+        }
 
   const copy_files: CopyFileEntry[] = [];
   if (fileTemplateConfig.copy_files && Array.isArray(fileTemplateConfig.copy_files)) {
@@ -371,8 +386,29 @@ export async function update(sourcePath: string, templateName: string, options: 
     .filter(file => isExecutable(path.join(resolvedPath, file), file))
     .filter(file => !shouldExcludeFile(file));
 
+  // In additive mode, only add executables that were explicitly selected by the user
+  let selectedExecutables: string[] = [];
+  if (!isFullMode) {
+    // In additive mode, only include executables that are in selectedFiles (user explicitly chose them)
+    // BUT exclude files that already exist in copy_files with custom settings (chmod, substitute_variables: false)
+    const existingCopyFiles = config.templates[templateName].copy_files || [];
+    const existingCopySrcs = new Set(existingCopyFiles.map(cf => cf.src));
+    const existingCustomSettings = new Set(
+      existingCopyFiles
+        .filter(cf => cf.chmod || cf.substitute_variables === false)
+        .map(cf => cf.src)
+    );
+    
+    selectedExecutables = detectedExecutables.filter(exec => 
+      selectedFiles.includes(exec) && !existingCustomSettings.has(exec)
+    );
+  } else {
+    // In full mode, include all detected executables (original behavior)
+    selectedExecutables = detectedExecutables;
+  }
+
   const existingPostCopy = config.templates[templateName].post_copy || [];
-  const post_copy = mergePostCopyFiles(existingPostCopy, fileTemplateConfig.post_copy, detectedExecutables);
+  const post_copy = mergePostCopyFiles(existingPostCopy, fileTemplateConfig.post_copy, selectedExecutables);
 
   if (post_copy.length > 0) {
     templateConfig.post_copy = post_copy;
@@ -386,9 +422,7 @@ export async function update(sourcePath: string, templateName: string, options: 
       ...templateConfig
     };
 
-    process.stdout.write(JSON.stringify(output, null, 2) + '\n', () => {
-      process.exit(0);
-    });
+    process.stdout.write(JSON.stringify(output, null, 2) + '\n');
     return;
   }
 

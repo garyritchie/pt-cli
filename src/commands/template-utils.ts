@@ -151,7 +151,9 @@ export function getRootEntries(dirPath: string, ignorePatterns?: string[]): { fi
     .filter(e => !shouldExclude(dirPath, path.join(dirPath, e.name), ignorePatterns))
     .filter(e => !shouldIgnore(e.name, e.name, ignorePatterns));
 
-  const files = entries.filter(e => e.isFile()).map(e => e.name);
+  const files = entries.filter(e => e.isFile())
+    .map(e => e.name)
+    .filter(fileName => !shouldExcludeFile(fileName));
   const dirs = entries.filter(e => e.isDirectory()).map(e => e.name);
   return { files, dirs };
 }
@@ -207,16 +209,25 @@ export function mergePostConfigTasks(
   if (jsonTasks && Array.isArray(jsonTasks)) {
     return [...jsonTasks];
   }
-  return detectedTasks.length > 0 ? detectedTasks : existingTasks;
+  // Merge detected tasks with existing, avoiding duplicates
+  const merged = [...existingTasks];
+  for (const dt of detectedTasks) {
+    const exists = merged.some(et => et.command === dt.command && et.script === dt.script);
+    if (!exists) {
+      merged.push(dt);
+    }
+  }
+  return merged;
 }
 
 /**
  * Merge post_copy files from existing, JSON file, and detected executables
+ * Only adds executables that were explicitly selected by the user
  */
 export function mergePostCopyFiles(
   existingPostCopy: PostCopyFile[],
   jsonPostCopy: PostCopyFile[] | undefined,
-  detectedExecutables: string[]
+  selectedExecutables: string[]
 ): PostCopyFile[] {
   let post_copy = [...existingPostCopy];
 
@@ -228,11 +239,9 @@ export function mergePostCopyFiles(
     }
   }
 
-  const newExecutables = detectedExecutables.filter(file => !post_copy.some(existing => existing.src === file));
-  
-  if (newExecutables.length > 0) {
-    // In interactive mode, we'd prompt to add these - for now just auto-add
-    for (const file of newExecutables) {
+  // Only add executables that were explicitly selected by the user
+  for (const file of selectedExecutables) {
+    if (!post_copy.some(existing => existing.src === file)) {
       post_copy.push({ src: file, dest: file });
     }
   }

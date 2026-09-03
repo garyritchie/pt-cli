@@ -38,15 +38,16 @@ function cleanConfig() {
 
 /** Capture console.log output during an async callback. */
 async function captureStdout(fn: () => Promise<void>): Promise<string> {
-  const original = console.log;
+  const originalWrite = process.stdout.write;
   let captured = '';
-  console.log = (...args: unknown[]) => {
-    captured += args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + '\n';
+  process.stdout.write = (chunk: any) => {
+    captured += chunk.toString();
+    return true;
   };
   try {
     await fn();
   } finally {
-    console.log = original;
+    process.stdout.write = originalWrite;
   }
   return captured;
 }

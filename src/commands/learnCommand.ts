@@ -281,14 +281,21 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
       folders = existingTemplate.folders;
     }
 
+    // selectedStructure should include ALL folders (existing + added) in additive mode
+    // so that the final filter doesn't drop user-selected new folders
+    selectedStructure = [
+      ...new Set([
+        ...existingTemplate.folders?.map((f: FolderNode) => f.name) || [],
+        ...folders.filter(f => !existingTemplate.folders?.some(ef => ef.name === f.name)).map(f => f.name),
+      ]),
+    ];
+
     // New files
     const newFiles = rootFiles.filter((f: string) => !existingTemplate.copy_files?.some((cf: CopyFileEntry) => cf.src === f));
     printNewFiles(newFiles.length, newFiles);
     const addedFiles = await promptNewFiles(newFiles, options);
     selectedFiles = [...(existingTemplate.copy_files?.filter((cf: CopyFileEntry) => !rootDirs.includes(cf.src)).map((cf: CopyFileEntry) => cf.src) || []), ...addedFiles];
 
-    // Structure
-    selectedStructure = existingTemplate.folders?.map((f: FolderNode) => f.name) || [];
     // Seed selectedFolders from existing copy_files directory entries
     selectedFolders = (existingTemplate.copy_files || [])
       .filter((f: CopyFileEntry) => rootDirs.includes(f.src))
@@ -311,7 +318,14 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
 
   // --- COPY FILES ---
   const existingCopyFiles = isUpdate ? config.templates[updateTemplate].copy_files || [] : [];
-  const copy_files = buildCopyFiles(selectedFiles, selectedFolders, existingCopyFiles);
+  
+  // If JSON template config has copy_files, use those directly (for new templates)
+  let copy_files: CopyFileEntry[];
+  if (!isUpdate && fileTemplateConfig.copy_files && Array.isArray(fileTemplateConfig.copy_files)) {
+    copy_files = [...fileTemplateConfig.copy_files];
+  } else {
+    copy_files = buildCopyFiles(selectedFiles, selectedFolders, existingCopyFiles);
+  }
 
   const templateConfig: TemplateConfig = {
     description: description,
@@ -360,8 +374,18 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
     .filter(file => isExecutable(path.join(resolvedPath, file), file))
     .filter(file => !shouldExcludeFile(file));
 
+  // In additive mode (isUpdate), only add executables that were explicitly selected by the user
+  let selectedExecutables: string[] = [];
+  if (isUpdate) {
+    // In additive mode, only include executables that are in selectedFiles (user explicitly chose them)
+    selectedExecutables = detectedExecutables.filter(exec => selectedFiles.includes(exec));
+  } else {
+    // In new template mode, include all detected executables (original behavior)
+    selectedExecutables = detectedExecutables;
+  }
+
   const existingPostCopy = isUpdate ? config.templates[updateTemplate].post_copy || [] : [];
-  const post_copy = mergePostCopyFiles(existingPostCopy, fileTemplateConfig.post_copy, detectedExecutables);
+  const post_copy = mergePostCopyFiles(existingPostCopy, fileTemplateConfig.post_copy, selectedExecutables);
 
   if (post_copy.length > 0) {
     templateConfig.post_copy = post_copy;
@@ -372,9 +396,7 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   // --- OUTPUT ---
   if (options.json) {
     const output = { name: targetName, ...templateConfig };
-    process.stdout.write(JSON.stringify(output, null, 2) + '\n', () => {
-      process.exit(0);
-    });
+    process.stdout.write(JSON.stringify(output, null, 2) + '\n');
     return;
   }
 

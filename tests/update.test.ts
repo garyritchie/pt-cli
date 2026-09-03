@@ -366,6 +366,51 @@ test('update: handles post_copy executables additively', async () => {
   }
 });
 
+test('update: does not add post_config.sh/.bat to post_copy when unchecked', async () => {
+  const srcDir = createSourceDir('.test-update-postconfig-exclude');
+  cleanup(testHome);
+  
+  try {
+    const initialConfig: PtConfig = {
+      version: '3.0',
+      templates: {
+        'update-test-pc-exclude': {
+          description: 'Test',
+          templateRoot: '/old/path',
+          folders: [],
+          copy_files: [],
+          variables: [],
+          post_copy: []
+        }
+      }
+    };
+    saveConfig(initialConfig);
+
+    // Create post_config scripts - these should be excluded by shouldExcludeFile
+    fs.writeFileSync(path.join(srcDir, 'post_config.sh'), '#!/bin/bash\necho "Running: Build"\nnpm run build\n');
+    fs.writeFileSync(path.join(srcDir, 'post_config.bat'), '@echo off\necho Running: Build\nnpm run build\n');
+    fs.chmodSync(path.join(srcDir, 'post_config.sh'), 0o755);
+    fs.chmodSync(path.join(srcDir, 'post_config.bat'), 0o755);
+
+    await update(srcDir, 'update-test-pc-exclude', { yes: true });
+
+    const config = loadConfig();
+    const tpl = config.templates['update-test-pc-exclude'];
+    
+    // post_config.sh and post_config.bat should NOT be in post_copy
+    const postCopySrcs = (tpl.post_copy || []).map(pc => pc.src);
+    assert.ok(!postCopySrcs.includes('post_config.sh'), 'post_config.sh should not be in post_copy');
+    assert.ok(!postCopySrcs.includes('post_config.bat'), 'post_config.bat should not be in post_copy');
+    
+    // They should also not be in copy_files
+    const copySrcs = (tpl.copy_files || []).map(cf => cf.src);
+    assert.ok(!copySrcs.includes('post_config.sh'), 'post_config.sh should not be in copy_files');
+    assert.ok(!copySrcs.includes('post_config.bat'), 'post_config.bat should not be in copy_files');
+  } finally {
+    cleanup(srcDir, testHome);
+  }
+});
+
 test('update: JSON mode outputs template config', async () => {
   const srcDir = createSourceDir('.test-update-json');
   cleanup(testHome);
@@ -390,21 +435,30 @@ test('update: JSON mode outputs template config', async () => {
     fs.writeFileSync(path.join(srcDir, 'template.txt'), '{{ var }}');
 
     // Capture stdout using a proper approach
-    const output: string[] = [];
-    const originalLog = console.log;
-    console.log = (...args: any[]) => {
-      output.push(args.join(' '));
+    const originalWrite = process.stdout.write;
+    let stdoutOutput = '';
+    process.stdout.write = (chunk: any) => {
+      stdoutOutput += chunk.toString();
+      return true;
     };
-    
+
     try {
       await update(srcDir, 'update-test-json', { yes: true, json: true });
     } finally {
-      console.log = originalLog;
+      process.stdout.write = originalWrite;
     }
     
-    // Find the JSON line (last line that starts with {)
-    const jsonLine = output.reverse().find(line => line.trim().startsWith('{'));
-    const parsed = JSON.parse(jsonLine!);
+    // Debug output
+    // console.error('stdoutOutput:', JSON.stringify(stdoutOutput));
+    
+    // Find the JSON (starts with { and goes to end)
+    const firstBrace = stdoutOutput.indexOf('{');
+    if (firstBrace === -1) {
+      console.error('No JSON found. Full output:', stdoutOutput);
+      assert.fail('No JSON output found');
+    }
+    const jsonString = stdoutOutput.substring(firstBrace);
+    const parsed = JSON.parse(jsonString);
     assert.strictEqual(parsed.name, 'update-test-json');
     assert.ok(parsed.folders);
     assert.ok(parsed.copy_files);

@@ -147,9 +147,9 @@ test('DEFAULT_EXCLUDES contains expected patterns', () => {
   assert.ok(DEFAULT_EXCLUDES.includes('node_modules'), 'Should include node_modules');
   assert.ok(DEFAULT_EXCLUDES.includes('dist'), 'Should include dist');
   assert.ok(DEFAULT_EXCLUDES.includes('build'), 'Should include build');
+  assert.ok(DEFAULT_EXCLUDES.includes('.vscode'), 'Should include .vscode');
   assert.ok(DEFAULT_EXCLUDES.includes('.DS_Store'), 'Should include .DS_Store');
   assert.ok(DEFAULT_EXCLUDES.includes('Thumbs.db'), 'Should include Thumbs.db');
-  assert.ok(!DEFAULT_EXCLUDES.includes('.vscode'), 'Should NOT include .vscode');
   assert.ok(!DEFAULT_EXCLUDES.includes('.gitea'), 'Should NOT include .gitea');
   assert.ok(!DEFAULT_EXCLUDES.includes('.stignore'), 'Should NOT include .stignore');
 });

@@ -72,15 +72,31 @@ program
   });
 
 program
-  .command('init [templateName] [destPath]')
-  .description('Initialize a new project from a learned template')
+  .command('init [args...]')
+  .description('Initialize a new project from one or more learned templates')
   .option('-f, --file <jsonPath>', 'Initialize directly from a JSON template file without adding it to local config')
   .option('--skip-post-config', 'Skip running post-config tasks')
   .option('--dry-run', 'Show what would be created without making changes')
   .option('-y, --yes', 'Automatically answer yes to prompts')
   .option('--vars <variables>', 'Comma-separated key=value variables (e.g. key1=val1,key2=val2)')
-  .action(async (typeName: string | undefined, destPath: string | undefined, options) => {
-    await init(typeName, destPath, options);
+  .option('--collision <mode>', 'File collision resolution strategy (overwrite, newest)', 'overwrite')
+  .option('--json', 'Output result as JSON')
+  .action(async (args: string[], options) => {
+    try {
+      await init(args, options);
+    } catch (err: any) {
+      if (options.json) {
+        process.stdout.write(JSON.stringify({
+          status: 'error',
+          message: err.message || String(err)
+        }) + '\n', () => {
+          process.exit(1);
+        });
+      } else {
+        console.error(chalk.red(`Error: ${err.message || err}`));
+        process.exit(1);
+      }
+    }
   });
 
 program

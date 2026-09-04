@@ -66,8 +66,8 @@ _pt_completions() {
       ;;
     init)
       if [[ "$cur" == -* ]]; then
-        COMPREPLY=( $(compgen -W "-f --file --skip-post-config --dry-run -y --yes --vars -h --help" -- "$cur") )
-      elif [[ $cword -eq 2 ]]; then
+        COMPREPLY=( $(compgen -W "-f --file --skip-post-config --dry-run -y --yes --vars --collision --json -h --help" -- "$cur") )
+      elif [[ $cword -ge 2 ]]; then
         local templates
         templates=$(pt completion --templates 2>/dev/null)
         COMPREPLY=( $(compgen -W "$templates" -- "$cur") )
@@ -200,9 +200,10 @@ _pt() {
             '--dry-run[Show what would be created without making changes]' \\
             '(-y --yes)'{-y,--yes}'[Automatically answer yes to prompts]' \\
             '--vars=[Comma-separated key=value variables]:variables:' \\
+            '--collision=[File collision resolution strategy]:mode:(overwrite newest)' \\
+            '--json[Output result as JSON]' \\
             '(-h --help)'{-h,--help}'[display help for command]' \\
-            '1:template:_pt_templates' \\
-            '2:destPath:_files -/'
+            '*:templates:_pt_templates'
           ;;
         config)
           _arguments \\
@@ -329,6 +330,8 @@ complete -c pt -n '__fish_pt_using_command init' -l skip-post-config -d 'Skip ru
 complete -c pt -n '__fish_pt_using_command init' -l dry-run -d 'Show what would be created without making changes'
 complete -c pt -n '__fish_pt_using_command init' -s y -l yes -d 'Automatically answer yes to prompts'
 complete -c pt -n '__fish_pt_using_command init' -l vars -d 'Comma-separated key=value variables'
+complete -c pt -n '__fish_pt_using_command init' -l collision -a 'overwrite newest' -d 'File collision resolution strategy'
+complete -c pt -n '__fish_pt_using_command init' -l json -d 'Output result as JSON'
 
 # config
 complete -c pt -n '__fish_pt_using_command config' -a '(__fish_pt_templates)' -d 'Template name'

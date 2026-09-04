@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
-import { loadConfig, FolderNode, sanitizePath, TemplateConfig } from '../config.js';
+import { loadConfig, FolderNode, sanitizePath, TemplateConfig, TemplateVariable, PostConfigTask, PtConfig } from '../config.js';
 import chalk from 'chalk';
-import { processCopyFiles } from '../substitute.js';
+import { processCopyFiles, substituteVariables } from '../substitute.js';
 import { execSync } from 'child_process';
 
 export interface InitOptions {
@@ -12,136 +12,304 @@ export interface InitOptions {
   yes?: boolean;
   vars?: string;
   file?: string;
+  collision?: 'overwrite' | 'newest';
+  json?: boolean;
+}
+
+interface LoadedTemplate {
+  name: string;
+  template: TemplateConfig;
+  sourceFile?: string;
+}
+
+/**
+ * Recursively merges two arrays of FolderNodes, deduplicating matching folder names.
+ * Sub-children are recursively merged, and later nodes take precedence for info/is_file.
+ */
+export function mergeFolderNodes(nodesA: FolderNode[], nodesB: FolderNode[]): FolderNode[] {
+  const map = new Map<string, FolderNode>();
+
+  function cloneNode(node: FolderNode): FolderNode {
+    return {
+      name: node.name,
+      info: node.info,
+      is_file: node.is_file,
+      children: node.children ? node.children.map(cloneNode) : undefined
+    };
+  }
+
+  for (const node of nodesA) {
+    map.set(node.name, cloneNode(node));
+  }
+
+  for (const node of nodesB) {
+    if (map.has(node.name)) {
+      const existing = map.get(node.name)!;
+      if (node.info) {
+        existing.info = node.info;
+      }
+      if (node.is_file !== undefined) {
+        existing.is_file = node.is_file;
+      }
+      if (node.children && node.children.length > 0) {
+        existing.children = mergeFolderNodes(existing.children || [], node.children);
+      }
+    } else {
+      map.set(node.name, cloneNode(node));
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+/**
+ * Merges variables across multiple templates.
+ * Variables with the same name are deduplicated; later templates override default values.
+ */
+export function mergeVariables(templates: LoadedTemplate[]): TemplateVariable[] {
+  const varMap = new Map<string, TemplateVariable>();
+  for (const { template } of templates) {
+    if (!template.variables) continue;
+    for (const v of template.variables) {
+      if (varMap.has(v.name)) {
+        const existing = varMap.get(v.name)!;
+        varMap.set(v.name, {
+          name: v.name,
+          prompt: v.prompt || existing.prompt,
+          default: v.default !== undefined ? v.default : existing.default,
+          required: v.required !== undefined ? v.required : existing.required
+        });
+      } else {
+        varMap.set(v.name, { ...v });
+      }
+    }
+  }
+  return Array.from(varMap.values());
+}
+
+/**
+ * Checks if a given destination path corresponds to a root-level readme.md file.
+ */
+export function isRootReadme(filePath: string): boolean {
+  const norm = sanitizePath(filePath).replace(/\\/g, '/');
+  const parts = norm.split('/').filter(Boolean);
+  return parts.length === 1 && /^readme\.md$/i.test(parts[0]);
 }
 
 /**
  * Scan parent directories for .env files and parse their variables.
- * Returns a map of variable names to their values, supporting:
- * - KEY=VALUE format
- * - KEY="VALUE with spaces" format
- * - KEY='VALUE with spaces' format
- * - Comments (lines starting with #)
- * - Empty lines
  */
 function scanEnvForVariables(targetPath: string): Record<string, string> {
   const envVars: Record<string, string> = {};
   let currentDir = path.resolve(targetPath);
-  
-  // Scan up to 5 parent directories for .env files
   const maxDepth = 5;
-  
+
   for (let depth = 0; depth < maxDepth; depth++) {
     const envPath = path.join(currentDir, '.env');
-    
+
     if (fs.existsSync(envPath)) {
       try {
         const content = fs.readFileSync(envPath, 'utf-8');
         const lines = content.split('\n');
-        
+
         for (const line of lines) {
           const trimmed = line.trim();
-          
-          // Skip empty lines and comments
           if (!trimmed || trimmed.startsWith('#')) {
             continue;
           }
-          
-          // Match KEY=VALUE patterns
+
           const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$/);
           if (match) {
             const key = match[1];
             let value = match[2];
-            
-            // Remove surrounding quotes if present
-            if ((value.startsWith('"') && value.endsWith('"')) || 
+
+            if ((value.startsWith('"') && value.endsWith('"')) ||
                 (value.startsWith("'") && value.endsWith("'"))) {
               value = value.slice(1, -1);
             }
-            
+
             envVars[key] = value;
           }
         }
       } catch (err) {
-        // Silently skip unreadable .env files
         continue;
       }
     }
-    
-    // Move to parent directory
+
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir) {
-      // Reached filesystem root
       break;
     }
     currentDir = parentDir;
   }
-  
+
   return envVars;
 }
 
-export async function init(targetName: string | undefined, destPath: string | undefined, options: InitOptions = {}) {
+export async function init(
+  targetOrArgs?: string | string[] | undefined,
+  destPathOrOptions?: string | InitOptions,
+  optionsOrUndefined?: InitOptions
+) {
   const config = loadConfig();
 
-  let typeName: string | undefined = targetName;
-  let dest: string | undefined = destPath;
-  let template: TemplateConfig;
+  let rawTemplates: string[] = [];
+  let dest: string | undefined;
+  let options: InitOptions = {};
 
-  if (options.file) {
-    // If direct template file is specified, targetName could be the destPath if destPath is omitted
-    if (typeName && !dest) {
-      dest = typeName;
-      typeName = undefined;
+  if (Array.isArray(targetOrArgs)) {
+    options = (destPathOrOptions as InitOptions) || {};
+    if (targetOrArgs.length === 0) {
+      rawTemplates = [];
+      dest = undefined;
+    } else if (targetOrArgs.length === 1) {
+      if (options.file) {
+        rawTemplates = [options.file];
+        dest = targetOrArgs[0];
+      } else {
+        rawTemplates = [targetOrArgs[0]];
+        dest = undefined;
+      }
+    } else {
+      if (options.file) {
+        rawTemplates = [options.file, ...targetOrArgs.slice(0, -1)];
+      } else {
+        rawTemplates = targetOrArgs.slice(0, -1);
+      }
+      dest = targetOrArgs[targetOrArgs.length - 1];
     }
-
-    try {
-      const fileContent = fs.readFileSync(options.file, 'utf-8');
-      template = JSON.parse(fileContent);
-    } catch (e) {
-      console.error(chalk.red(`Error: Failed to read/parse template file "${options.file}": ${(e as Error).message}`));
-      process.exit(1);
+  } else if (typeof targetOrArgs === 'string') {
+    if (typeof destPathOrOptions === 'string') {
+      dest = destPathOrOptions;
+      options = optionsOrUndefined || {};
+    } else if (destPathOrOptions !== undefined) {
+      dest = undefined;
+      options = (destPathOrOptions as InitOptions) || {};
+    } else {
+      dest = undefined;
+      options = optionsOrUndefined || {};
     }
-
-    if (!typeName) {
-      typeName = (template as any).name || 'custom-template';
+    if (options.file && !dest) {
+      dest = targetOrArgs;
+      rawTemplates = [options.file];
+    } else {
+      rawTemplates = options.file ? [options.file, targetOrArgs] : [targetOrArgs];
     }
   } else {
-    // If no name provided, list templates
-    if (!typeName) {
-      const names = Object.keys(config.templates);
-      if (names.length === 0) {
-        console.log(chalk.red("No templates found. Run 'pt learn <path>' first."));
-        return;
-      }
-
-      if (options.yes) {
-        console.error(chalk.red("No project type specified and running in non-interactive mode."));
-        process.exit(1);
-      }
-      const { selected } = await inquirer.prompt({
-        type: 'list',
-        name: 'selected',
-        message: 'Select Project Type:',
-        loop: false,
-        theme: {
-          icon: {
-            cursor: chalk.green('[x] ')
-          }
-        },
-        choices: names.map(n => ({ name: n, value: n }))
-      });
-      typeName = selected;
+    // targetOrArgs is undefined
+    if (typeof destPathOrOptions === 'string') {
+      dest = destPathOrOptions;
+      options = optionsOrUndefined || {};
+    } else if (destPathOrOptions !== undefined) {
+      dest = undefined;
+      options = (destPathOrOptions as InitOptions) || {};
+    } else {
+      dest = undefined;
+      options = optionsOrUndefined || {};
     }
-
-    template = config.templates[typeName!];
-    if (!template) {
-      console.error(chalk.red(`Template "${typeName}" not found.`));
-      process.exit(1);
+    if (options.file) {
+      rawTemplates = [options.file];
     }
   }
 
+  // Interactive selection if no templates specified
+  if (rawTemplates.length === 0) {
+    const names = Object.keys(config.templates);
+    if (names.length === 0) {
+      const msg = "No templates found. Run 'pt learn <path>' first.";
+      if (options.json) {
+        console.error(JSON.stringify({ status: 'error', message: msg }));
+      } else {
+        console.log(chalk.red(msg));
+      }
+      process.exit(1);
+    }
+
+    if (options.yes) {
+      const msg = "No project type specified and running in non-interactive mode.";
+      if (options.json) {
+        console.error(JSON.stringify({ status: 'error', message: msg }));
+      } else {
+        console.error(chalk.red(msg));
+      }
+      process.exit(1);
+    }
+
+    const { selected } = await inquirer.prompt({
+      type: 'checkbox',
+      name: 'selected',
+      message: 'Select Project Type(s):',
+      loop: false,
+      validate: (answer) => (answer.length < 1 ? 'You must choose at least one template.' : true),
+      theme: {
+        icon: {
+          checked: chalk.green('[x] '),
+          unchecked: '[ ] '
+        }
+      },
+      choices: names.map(n => ({ name: n, value: n }))
+    });
+    rawTemplates = selected;
+  }
+
+  // Load each template configuration
+  const loadedTemplates: LoadedTemplate[] = [];
+  for (const item of rawTemplates) {
+    // Check if item is a local json file path or exists on disk
+    if (item.endsWith('.json') || fs.existsSync(item)) {
+      try {
+        const resolvedPath = path.resolve(item);
+        const fileContent = fs.readFileSync(resolvedPath, 'utf-8');
+        const parsed = JSON.parse(fileContent);
+        const name = parsed.name || path.basename(item, path.extname(item));
+
+        if (parsed.templateRoot && !path.isAbsolute(parsed.templateRoot)) {
+          parsed.templateRoot = path.resolve(path.dirname(resolvedPath), parsed.templateRoot);
+        } else if (!parsed.templateRoot) {
+          parsed.templateRoot = path.dirname(resolvedPath);
+        }
+
+        loadedTemplates.push({
+          name,
+          template: parsed,
+          sourceFile: resolvedPath
+        });
+      } catch (e: any) {
+        const msg = `Failed to read/parse template file "${item}": ${e.message}`;
+        if (options.json) {
+          console.error(JSON.stringify({ status: 'error', message: msg }));
+        } else {
+          console.error(chalk.red(`Error: ${msg}`));
+        }
+        process.exit(1);
+      }
+    } else {
+      const template = config.templates[item];
+      if (!template) {
+        const msg = `Template "${item}" not found.`;
+        if (options.json) {
+          console.error(JSON.stringify({ status: 'error', message: msg }));
+        } else {
+          console.error(chalk.red(msg));
+        }
+        process.exit(1);
+      }
+      loadedTemplates.push({
+        name: item,
+        template: JSON.parse(JSON.stringify(template)) // Clone to prevent mutating config
+      });
+    }
+  }
+
+  // Prompt for destination if not provided
   if (!dest) {
     if (options.yes) {
-      console.error(chalk.red("No destination path specified and running in non-interactive mode."));
+      const msg = "No destination path specified and running in non-interactive mode.";
+      if (options.json) {
+        console.error(JSON.stringify({ status: 'error', message: msg }));
+      } else {
+        console.error(chalk.red(msg));
+      }
       process.exit(1);
     }
     const { name } = await inquirer.prompt({
@@ -155,23 +323,35 @@ export async function init(targetName: string | undefined, destPath: string | un
   const resolvedDest = path.resolve(dest!);
 
   if (fs.existsSync(resolvedDest) && !options.dryRun) {
-    console.error(chalk.red(`Error: Destination "${resolvedDest}" already exists.`));
+    const msg = `Destination "${resolvedDest}" already exists.`;
+    if (options.json) {
+      console.error(JSON.stringify({ status: 'error', message: msg }));
+    } else {
+      console.error(chalk.red(`Error: ${msg}`));
+    }
     process.exit(1);
   }
 
-  if (options.dryRun) {
-    console.log(chalk.yellow(`\n[DRY RUN] Initializing project "${template.description}" at: ${resolvedDest}`));
-  } else {
-    console.log(chalk.cyan(`\nInitializing project "${template.description}" at: ${resolvedDest}`));
+  const templateNames = loadedTemplates.map(l => l.name);
+  const compositeDescription = loadedTemplates.length === 1
+    ? (loadedTemplates[0].template.description || '')
+    : loadedTemplates.map(l => `${l.name}: ${l.template.description || ''}`).join('; ');
+
+  if (!options.json) {
+    if (options.dryRun) {
+      console.log(chalk.yellow(`\n[DRY RUN] Initializing project "${compositeDescription}" at: ${resolvedDest}`));
+    } else {
+      console.log(chalk.cyan(`\nInitializing project "${compositeDescription}" at: ${resolvedDest}`));
+    }
   }
 
-  // Handle Variables
+  // Merge Variables
+  const mergedVarsDef = mergeVariables(loadedTemplates);
   let variables: Record<string, string> = {};
-  if (template.variables && template.variables.length > 0) {
+
+  if (mergedVarsDef.length > 0) {
     // Scan parent directories for .env files and pre-fill variables
     const envVars = scanEnvForVariables(resolvedDest);
-    
-    // Merge .env variables into variables (with lower priority than --vars)
     if (Object.keys(envVars).length > 0) {
       for (const [key, value] of Object.entries(envVars)) {
         if (!variables[key]) {
@@ -179,9 +359,8 @@ export async function init(targetName: string | undefined, destPath: string | un
         }
       }
     }
-    
+
     if (options.vars) {
-      // Parse --vars "key=val,key2=val2"
       const pairs = options.vars.split(',').map((p: string) => p.trim());
       for (const pair of pairs) {
         const [k, ...v] = pair.split('=');
@@ -192,8 +371,7 @@ export async function init(targetName: string | undefined, destPath: string | un
     }
 
     if (!options.yes) {
-      // Prompt for any missing variables
-      for (const v of template.variables) {
+      for (const v of mergedVarsDef) {
         if (!variables[v.name]) {
           const answer = await inquirer.prompt({
             type: 'input',
@@ -205,11 +383,15 @@ export async function init(targetName: string | undefined, destPath: string | un
         }
       }
     } else {
-      // Non-interactive mode: check required
-      for (const v of template.variables) {
+      for (const v of mergedVarsDef) {
         if (!variables[v.name]) {
           if (v.required) {
-            console.error(chalk.red(`Error: Variable "${v.name}" is required but was not provided in non-interactive mode. Use --vars ${v.name}=value`));
+            const msg = `Variable "${v.name}" is required but was not provided in non-interactive mode. Use --vars ${v.name}=value`;
+            if (options.json) {
+              console.error(JSON.stringify({ status: 'error', message: msg }));
+            } else {
+              console.error(chalk.red(`Error: ${msg}`));
+            }
             process.exit(1);
           } else {
             variables[v.name] = v.default || '';
@@ -219,132 +401,218 @@ export async function init(targetName: string | undefined, destPath: string | un
     }
   }
 
-  // 1. Create structure
-  createStructure(resolvedDest, template.folders, options.dryRun);
-  
-  // Check if templateRoot exists (if it's defined)
-  const templateRootExists = template.templateRoot && fs.existsSync(template.templateRoot);
-  if (template.templateRoot && !templateRootExists) {
-    console.warn(chalk.yellow(`\nWarning: Template source directory not found: ${template.templateRoot}`));
-    console.warn(chalk.gray("Folder structure created, but files/boilerplate will be skipped."));
+  // 1. Create structure (deep merge folders across all templates)
+  let mergedFolders: FolderNode[] = [];
+  for (const { template } of loadedTemplates) {
+    if (template.folders) {
+      mergedFolders = mergeFolderNodes(mergedFolders, template.folders);
+    }
+  }
+  createStructure(resolvedDest, mergedFolders, options.dryRun, options.json);
+
+  // 2. Readme renaming logic
+  const templatesWithReadme: LoadedTemplate[] = [];
+  for (const lt of loadedTemplates) {
+    const hasReadme = (lt.template.copy_files || []).some(cf => isRootReadme(cf.dest || cf.src));
+    if (hasReadme) {
+      templatesWithReadme.push(lt);
+    }
   }
 
-  // 2. Process copy_files
-  if (template.copy_files && templateRootExists) {
-    if (options.dryRun) console.log(chalk.yellow("[DRY RUN] Processing copy_files..."));
-    else console.log(chalk.cyan("Processing copy_files..."));
-    await processCopyFiles(template.templateRoot!, resolvedDest, template, variables, options.dryRun);
-  }
-
-
-  // 3. Process post_copy (executable scripts)
-  if (template.post_copy && templateRootExists) {
-    if (options.dryRun) console.log(chalk.yellow("[DRY RUN] Processing post_copy..."));
-    else console.log(chalk.cyan("Processing post_copy..."));
-
-    for (const file of template.post_copy) {
-      const srcPath = path.join(template.templateRoot!, file.src);
-      const destPath = path.join(resolvedDest, sanitizePath(file.dest || file.src));
-
-      if (fs.existsSync(srcPath)) {
-        if (options.dryRun) {
-          console.log(chalk.gray(`  [DRY RUN] Would copy ${file.src} → ${file.dest || file.src}`));
-          console.log(chalk.gray(`  [DRY RUN] Would chmod +x ${file.dest || file.src}`));
-          continue;
+  const createdReadmes: string[] = [];
+  if (templatesWithReadme.length > 1) {
+    // Multiple templates have a root readme -> rename based on origin template name while preserving case
+    for (const lt of templatesWithReadme) {
+      for (const cf of lt.template.copy_files || []) {
+        const targetDest = cf.dest || cf.src;
+        if (isRootReadme(targetDest)) {
+          const baseName = path.basename(targetDest);
+          const match = baseName.match(/^(readme)(.*)(\.md)$/i);
+          let newDest: string;
+          if (match) {
+            newDest = `${match[1]}${match[2]}_${lt.name}${match[3]}`;
+          } else {
+            newDest = `readme_${lt.name}.md`;
+          }
+          cf.dest = newDest;
+          createdReadmes.push(newDest);
         }
-
-        let fileContent = fs.readFileSync(srcPath, 'utf-8');
-
-        // Substitute variables in post_copy files if template has variables
-        if (template.variables && template.variables.length > 0) {
-          const { substituteVariables } = await import('../substitute.js');
-          fileContent = substituteVariables(fileContent, variables);
-        }
-
-        const destDir = path.dirname(destPath);
-        fs.mkdirSync(destDir, { recursive: true });
-        fs.writeFileSync(destPath, fileContent);
-
-        // post_copy files are executables by definition — always chmod
-        try {
-          // Check if source had execute permissions, otherwise default to 0o755
-          const srcStat = fs.statSync(srcPath);
-          fs.chmodSync(destPath, srcStat.mode & 0o111 ? srcStat.mode : 0o755);
-        } catch (e) {
-          // chmod not available (Windows)
-        }
-        console.log(chalk.green("  ✓ " + (file.dest || file.src)));
-      } else {
-        console.warn(chalk.yellow("  ! " + file.src + " not found, skipping"));
+      }
+    }
+  } else if (templatesWithReadme.length === 1) {
+    // Exactly one template has a root readme -> keep standard name
+    for (const cf of templatesWithReadme[0].template.copy_files || []) {
+      const targetDest = cf.dest || cf.src;
+      if (isRootReadme(targetDest)) {
+        createdReadmes.push(targetDest);
       }
     }
   }
-  // Write .info.md
+
+  // 3. Process copy_files for each template
+  const collisionMode = options.collision || 'overwrite';
+  for (const lt of loadedTemplates) {
+    const template = lt.template;
+    const templateRootExists = template.templateRoot && fs.existsSync(template.templateRoot);
+    if (template.templateRoot && !templateRootExists) {
+      if (!options.json) {
+        console.warn(chalk.yellow(`\nWarning: Template source directory not found: ${template.templateRoot}`));
+        console.warn(chalk.gray("Folder structure created, but files/boilerplate will be skipped."));
+      }
+    }
+
+    if (template.copy_files && templateRootExists) {
+      if (!options.json) {
+        if (options.dryRun) console.log(chalk.yellow(`[DRY RUN] Processing copy_files for ${lt.name}...`));
+        else console.log(chalk.cyan(`Processing copy_files for ${lt.name}...`));
+      }
+      await processCopyFiles(
+        template.templateRoot!,
+        resolvedDest,
+        template,
+        variables,
+        options.dryRun,
+        collisionMode,
+        options.json
+      );
+    }
+
+    // 4. Process post_copy (executable scripts)
+    if (template.post_copy && templateRootExists) {
+      if (!options.json) {
+        if (options.dryRun) console.log(chalk.yellow(`[DRY RUN] Processing post_copy for ${lt.name}...`));
+        else console.log(chalk.cyan(`Processing post_copy for ${lt.name}...`));
+      }
+
+      for (const file of template.post_copy) {
+        const srcPath = path.join(template.templateRoot!, file.src);
+        const destPath = path.join(resolvedDest, sanitizePath(file.dest || file.src));
+
+        if (fs.existsSync(srcPath)) {
+          if (options.dryRun) {
+            if (!options.json) {
+              console.log(chalk.gray(`  [DRY RUN] Would copy ${file.src} → ${file.dest || file.src}`));
+              console.log(chalk.gray(`  [DRY RUN] Would chmod +x ${file.dest || file.src}`));
+            }
+            continue;
+          }
+
+          if (collisionMode === 'newest' && fs.existsSync(destPath)) {
+            const destStat = fs.statSync(destPath);
+            const srcStat = fs.statSync(srcPath);
+            if (destStat.mtimeMs > srcStat.mtimeMs) {
+              if (!options.json) {
+                console.log(chalk.yellow(`  [COLLISION] Destination is newer, keeping ${file.dest || file.src}`));
+              }
+              continue;
+            }
+          }
+
+          let fileContent = fs.readFileSync(srcPath, 'utf-8');
+          if (mergedVarsDef.length > 0) {
+            fileContent = substituteVariables(fileContent, variables);
+          }
+
+          const destDir = path.dirname(destPath);
+          fs.mkdirSync(destDir, { recursive: true });
+          fs.writeFileSync(destPath, fileContent);
+
+          try {
+            const srcStat = fs.statSync(srcPath);
+            fs.chmodSync(destPath, srcStat.mode & 0o111 ? srcStat.mode : 0o755);
+          } catch (e) {}
+
+          if (!options.json) console.log(chalk.green("  ✓ " + (file.dest || file.src)));
+        } else if (!options.json) {
+          console.warn(chalk.yellow("  ! " + file.src + " not found, skipping"));
+        }
+      }
+    }
+  }
+
+  // 5. Write .info.md
   if (!options.dryRun) {
-    const infoContent = `# ${typeName}\n\n${template.description || ''}\n`;
+    let infoContent = '';
+    if (loadedTemplates.length === 1) {
+      infoContent = `# ${loadedTemplates[0].name}\n\n${loadedTemplates[0].template.description || ''}\n`;
+    } else {
+      infoContent = `# ${templateNames.join(', ')}\n\n`;
+      for (const lt of loadedTemplates) {
+        infoContent += `## ${lt.name}\n${lt.template.description || ''}\n\n`;
+      }
+    }
     fs.writeFileSync(path.join(resolvedDest, '.info.md'), infoContent);
-  } else {
+  } else if (!options.json) {
     console.log(chalk.gray(`  [DRY RUN] Would create .info.md`));
   }
 
-  // Use template post_config tasks
-  const allTasks = template.post_config?.filter(t => !t.type || t.type === typeName!) || [];
+  // 6. Concatenate post_config tasks in template order
+  const allTasks: PostConfigTask[] = [];
+  for (const lt of loadedTemplates) {
+    if (lt.template.post_config) {
+      for (const t of lt.template.post_config) {
+        if (!t.type || t.type === lt.name) {
+          allTasks.push(t);
+        }
+      }
+    }
+  }
 
   if (allTasks.length > 0 && !options.skipPostConfig) {
-    // SECURITY CHECK: Validate template safety before running post_config tasks
+    // SECURITY CHECK: Validate template safety
     const { validateTemplateSecurity } = await import('../safety.js');
-    const { valid, errors, warnings } = validateTemplateSecurity(template);
-    
-    if (!valid) {
-      console.error(chalk.red("\n❌ SECURITY ERROR: Aborting post_config execution due to blocked commands:"));
-      for (const err of errors) {
-        console.error(chalk.red(`   - ${err}`));
+    for (const lt of loadedTemplates) {
+      const { valid, errors, warnings } = validateTemplateSecurity(lt.template);
+
+      if (!valid) {
+        if (!options.json) {
+          console.error(chalk.red(`\n❌ SECURITY ERROR: Aborting post_config execution for "${lt.name}" due to blocked commands:`));
+          for (const err of errors) {
+            console.error(chalk.red(`   - ${err}`));
+          }
+        }
+        process.exit(1);
       }
-      process.exit(1);
+
+      if (warnings.length > 0) {
+        if (!options.json) {
+          console.warn(chalk.yellow(`\n⚠️  SECURITY WARNING: Post-config in "${lt.name}" contains dangerous commands:`));
+          for (const warn of warnings) {
+            console.warn(chalk.yellow(`   - ${warn}`));
+          }
+        }
+
+        if (!options.yes) {
+          const { proceed } = await inquirer.prompt({
+            type: 'confirm',
+            name: 'proceed',
+            message: chalk.red(`Are you sure you want to run post-config tasks for "${lt.name}"?`),
+            default: false
+          });
+          if (!proceed) {
+            if (!options.json) console.log(chalk.yellow("Post-config tasks aborted by user."));
+            return;
+          }
+        } else if (!options.json) {
+          console.warn(chalk.yellow("Proceeding anyway (non-interactive mode with auto-confirm enabled)."));
+        }
+      }
     }
 
-    if (warnings.length > 0) {
-      console.warn(chalk.yellow("\n⚠️  SECURITY WARNING: Post-config contains dangerous or suspicious commands:"));
-      for (const warn of warnings) {
-        console.warn(chalk.yellow(`   - ${warn}`));
-      }
-      
-      if (!options.yes) {
-        const { proceed } = await inquirer.prompt({
-          type: 'confirm',
-          name: 'proceed',
-          message: chalk.red('Are you sure you want to run these post-config tasks?'),
-          default: false
-        });
-        if (!proceed) {
-          console.log(chalk.yellow("Post-config tasks aborted by user."));
-          return;
-        }
-      } else {
-        console.warn(chalk.yellow("Proceeding anyway (non-interactive mode with auto-confirm enabled)."));
-      }
-    }
-    // Determine which tasks to include
     let selectedTaskNames: string[] = [];
 
-    if (options.skipPostConfig) {
-      // Skip entirely
-      selectedTaskNames = [];
-    } else if (options.dryRun) {
-      // In dry-run, select all (for display)
+    if (options.dryRun) {
       selectedTaskNames = allTasks.map(t => t.command || `./${t.script}` || '');
-      console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
-      for (const t of allTasks) {
-        const desc = t.description ? ` (${t.description})` : '';
-        console.log(chalk.gray(`  [template] - ${t.command || `./${t.script}`}${desc}`));
+      if (!options.json) {
+        console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
+        for (const t of allTasks) {
+          const desc = t.description ? ` (${t.description})` : '';
+          console.log(chalk.gray(`  [template] - ${t.command || `./${t.script}`}${desc}`));
+        }
       }
     } else if (options.yes) {
-      // All tasks selected
       selectedTaskNames = allTasks.map(t => t.command || `./${t.script}` || '');
-    } else if (allTasks.length === 0) {
-      selectedTaskNames = [];
     } else {
-      // Checkbox prompt
       const choices: Array<{name: string; value: string; checked?: boolean}> = [];
 
       for (const t of allTasks) {
@@ -372,20 +640,17 @@ export async function init(targetName: string | undefined, destPath: string | un
       });
       selectedTaskNames = response.selected || [];
     }
-    
-    // Write post_config scripts for selected tasks
+
     if (selectedTaskNames.length > 0 && !options.dryRun) {
       let bashContent = '#!/bin/bash\n# Auto-generated post_config script\n\n';
       let batContent = '@echo off\n:: Auto-generated post_config script\n\n';
       for (const t of allTasks) {
-        // Determine the actual command/script to use
         let cmd = '';
         if (t.command) {
           cmd = t.command;
         } else if (t.script) {
           cmd = `./${t.script}`;
         }
-        // Match against selected names (use command if available, else script)
         const taskKey = t.command || (t.script ? `./${t.script}` : '');
         if (selectedTaskNames.includes(taskKey)) {
           if (cmd) {
@@ -398,50 +663,57 @@ export async function init(targetName: string | undefined, destPath: string | un
       try { fs.chmodSync(path.join(resolvedDest, 'post_config.sh'), 0o755); } catch(e) {}
       fs.writeFileSync(path.join(resolvedDest, 'post_config.bat'), batContent);
 
-      // Execute the appropriate script
-      console.log(chalk.cyan("\nExecuting post-config tasks..."));
+      if (!options.json) console.log(chalk.cyan("\nExecuting post-config tasks..."));
       try {
         const scriptCmd = process.platform === 'win32' ? 'post_config.bat' : './post_config.sh';
-        execSync(scriptCmd, { 
-          cwd: resolvedDest, 
-          stdio: 'inherit' 
+        execSync(scriptCmd, {
+          cwd: resolvedDest,
+          stdio: options.json ? 'ignore' : 'inherit'
         });
       } catch (e) {
-        console.error(chalk.red("\nError: Some post-config tasks failed. Check the output above."));
+        if (!options.json) console.error(chalk.red("\nError: Some post-config tasks failed. Check the output above."));
       }
     }
   }
 
-  if (options.dryRun) {
+  if (options.json) {
+    const result = {
+      status: 'success',
+      dryRun: !!options.dryRun,
+      dest: resolvedDest,
+      templates: templateNames,
+      variables,
+      readmes: createdReadmes
+    };
+    console.log(JSON.stringify(result, null, 2));
+  } else if (options.dryRun) {
     console.log(chalk.yellow(`\n[DRY RUN] Project initialization preview complete.`));
   } else {
     console.log(chalk.green(`\n✓ Project created successfully.`));
   }
 }
 
-function createStructure(dirPath: string, folders: FolderNode[], dryRun: boolean = false) {
+function createStructure(dirPath: string, folders: FolderNode[], dryRun: boolean = false, silent: boolean = false) {
   for (const folder of folders) {
     const fullDirPath = path.join(dirPath, sanitizePath(folder.name));
 
     if (dryRun) {
-      console.log(chalk.gray(`  [DRY RUN] Would create directory: ${fullDirPath}`));
+      if (!silent) console.log(chalk.gray(`  [DRY RUN] Would create directory: ${fullDirPath}`));
     } else {
       fs.mkdirSync(fullDirPath, { recursive: true });
     }
 
-    // Create .info.md if content exists
     if (folder.info) {
       const infoPath = path.join(fullDirPath, '.info.md');
       if (dryRun) {
-        console.log(chalk.gray(`  [DRY RUN] Would create info file: ${infoPath}`));
+        if (!silent) console.log(chalk.gray(`  [DRY RUN] Would create info file: ${infoPath}`));
       } else {
         fs.writeFileSync(infoPath, folder.info);
       }
     }
 
-    // Recurse children
     if (folder.children && folder.children.length > 0) {
-      createStructure(fullDirPath, folder.children, dryRun);
+      createStructure(fullDirPath, folder.children, dryRun, silent);
     }
   }
 }

@@ -50,7 +50,9 @@ export async function processCopyFiles(
   resolvedDest: string,
   template: TemplateConfig,
   variables: Record<string, string>,
-  dryRun: boolean = false
+  dryRun: boolean = false,
+  collisionMode: 'overwrite' | 'newest' = 'overwrite',
+  silent: boolean = false
 ): Promise<void> {
   if (!template.copy_files) return;
 
@@ -59,7 +61,7 @@ export async function processCopyFiles(
     const destPath = path.join(resolvedDest, sanitizePath(copyFile.dest));
 
     if (!fs.existsSync(srcPath)) {
-      console.warn(chalk.yellow(`Warning: ${copyFile.src} not found in template`));
+      if (!silent) console.warn(chalk.yellow(`Warning: ${copyFile.src} not found in template`));
       continue;
     }
 
@@ -67,7 +69,7 @@ export async function processCopyFiles(
     if (stat.isDirectory()) {
       // Recursive directory copy
       if (dryRun) {
-        console.log(chalk.gray(`  [DRY RUN] Would recursively copy directory ${copyFile.src} → ${copyFile.dest}`));
+        if (!silent) console.log(chalk.gray(`  [DRY RUN] Would recursively copy directory ${copyFile.src} → ${copyFile.dest}`));
       } else {
         const dirSubstitute = !!(copyFile.substitute_variables === true || (
           copyFile.substitute_variables === undefined &&
@@ -75,24 +77,39 @@ export async function processCopyFiles(
           template.variables.length > 0 &&
           Object.keys(variables).length > 0
         ));
-        copyDirRecursive(srcPath, destPath, variables, dirSubstitute, copyFile.chmod);
+        copyDirRecursive(srcPath, destPath, variables, dirSubstitute, copyFile.chmod, collisionMode, silent);
       }
-      console.log(chalk.green(`  ✓ ${copyFile.dest} (recursive)`));
+      if (!silent) console.log(chalk.green(`  ✓ ${copyFile.dest} (recursive)`));
     } else {
+      // Check collision mode
+      if (collisionMode === 'newest' && fs.existsSync(destPath)) {
+        const destStat = fs.statSync(destPath);
+        if (destStat.mtimeMs > stat.mtimeMs) {
+          if (dryRun && !silent) {
+            console.log(chalk.yellow(`  [DRY RUN] [COLLISION] Destination is newer, keeping ${copyFile.dest}`));
+          } else if (!silent) {
+            console.log(chalk.yellow(`  [COLLISION] Destination is newer, keeping ${copyFile.dest}`));
+          }
+          continue;
+        }
+      }
+
       // Single file copy
       if (dryRun) {
-        console.log(chalk.gray(`  [DRY RUN] Would copy ${copyFile.src} → ${copyFile.dest}`));
-        const drySubstitute = !!(copyFile.substitute_variables === true || (
-          copyFile.substitute_variables === undefined &&
-          template.variables &&
-          template.variables.length > 0 &&
-          Object.keys(variables).length > 0
-        ));
-        if (drySubstitute) {
-          console.log(chalk.gray(`  [DRY RUN] Would substitute variables in ${copyFile.dest}`));
-        }
-        if (copyFile.chmod) {
-          console.log(chalk.gray(`  [DRY RUN] Would chmod ${copyFile.chmod} ${copyFile.dest}`));
+        if (!silent) {
+          console.log(chalk.gray(`  [DRY RUN] Would copy ${copyFile.src} → ${copyFile.dest}`));
+          const drySubstitute = !!(copyFile.substitute_variables === true || (
+            copyFile.substitute_variables === undefined &&
+            template.variables &&
+            template.variables.length > 0 &&
+            Object.keys(variables).length > 0
+          ));
+          if (drySubstitute) {
+            console.log(chalk.gray(`  [DRY RUN] Would substitute variables in ${copyFile.dest}`));
+          }
+          if (copyFile.chmod) {
+            console.log(chalk.gray(`  [DRY RUN] Would chmod ${copyFile.chmod} ${copyFile.dest}`));
+          }
         }
         continue;
       }
@@ -119,13 +136,13 @@ export async function processCopyFiles(
         try {
           fs.chmodSync(destPath, parseInt(copyFile.chmod, 8));
         } catch (e) {
-          if (process.platform !== 'win32') {
+          if (process.platform !== 'win32' && !silent) {
             console.error(chalk.red(`Failed to set chmod ${copyFile.chmod} on ${copyFile.dest}`));
           }
         }
       }
 
-      console.log(chalk.green(`  ✓ ${copyFile.dest}`));
+      if (!silent) console.log(chalk.green(`  ✓ ${copyFile.dest}`));
     }
   }
 }
@@ -135,7 +152,9 @@ function copyDirRecursive(
   dest: string,
   variables: Record<string, string>,
   substitute: boolean,
-  chmod?: string
+  chmod?: string,
+  collisionMode: 'overwrite' | 'newest' = 'overwrite',
+  silent: boolean = false
 ) {
   fs.mkdirSync(dest, { recursive: true });
   const entries = fs.readdirSync(src, { withFileTypes: true });
@@ -145,8 +164,16 @@ function copyDirRecursive(
     const destPath = path.join(dest, entry.name);
 
     if (entry.isDirectory()) {
-      copyDirRecursive(srcPath, destPath, variables, substitute, chmod);
+      copyDirRecursive(srcPath, destPath, variables, substitute, chmod, collisionMode, silent);
     } else {
+      if (collisionMode === 'newest' && fs.existsSync(destPath)) {
+        const destStat = fs.statSync(destPath);
+        const srcStat = fs.statSync(srcPath);
+        if (destStat.mtimeMs > srcStat.mtimeMs) {
+          continue;
+        }
+      }
+
       let content = fs.readFileSync(srcPath, 'utf-8');
       if (substitute) {
         content = substituteVariables(content, variables);

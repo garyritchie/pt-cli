@@ -25,7 +25,7 @@ const program = new Command();
 program
   .name('pt')
   .description('Project Template CLI - Learn project structures and initialize new ones')
-  .version(pkg.version, '-v', 'output the version number');
+  .version(pkg.version, '-v, --version', 'output the version number');
 
 program
   .command('learn [path]')

@@ -1,6 +1,4 @@
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import YAML from 'yaml';
 import { getConfigPath } from '../config.js';
 
@@ -404,12 +402,3 @@ export async function completionCommand(shellArg?: string, options?: { templates
   }
 }
 
-// Allow direct execution via tsx src/commands/completionCommand.ts <shell>
-if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const shell = process.argv[2];
-  if (shell === '--templates' || shell === '_templates') {
-    completionCommand(shell, { templates: true });
-  } else {
-    completionCommand(shell);
-  }
-}

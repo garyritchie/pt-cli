@@ -546,81 +546,111 @@ export async function init(
     console.log(chalk.gray(`  [DRY RUN] Would create .info.md`));
   }
 
-  // 6. Concatenate post_config tasks in template order
-  const allTasks: PostConfigTask[] = [];
+  // 6. Collect and deduplicate post_config tasks from all templates
+  // Key: command|description -> { task, templates: string[], _id: string }
+  const taskMap = new Map<string, PostConfigTask & { templates: string[]; _id: string }>();
+  let taskIdCounter = 0;
+  
   for (const lt of loadedTemplates) {
     if (lt.template.post_config) {
       for (const t of lt.template.post_config) {
         if (!t.type || t.type === lt.name) {
-          allTasks.push(t);
+          const key = `${t.command || t.script || ''}|${t.description || ''}`;
+          if (taskMap.has(key)) {
+            taskMap.get(key)!.templates.push(lt.name);
+          } else {
+            taskMap.set(key, { 
+              ...t, 
+              templates: [lt.name], 
+              _id: `task_${taskIdCounter++}` 
+            });
+          }
         }
       }
     }
   }
+  
+  const allTasks = Array.from(taskMap.values());
 
   if (allTasks.length > 0 && !options.skipPostConfig) {
-    // SECURITY CHECK: Validate template safety
+    // SECURITY CHECK: Validate template safety (aggregate across all templates)
     const { validateTemplateSecurity } = await import('../safety.js');
+    
+    // Collect all errors and warnings from all templates first
+    const allErrors: Array<{ template: string; error: string }> = [];
+    const allWarnings: Array<{ template: string; warning: string }> = [];
+    
     for (const lt of loadedTemplates) {
       const { valid, errors, warnings } = validateTemplateSecurity(lt.template);
-
-      if (!valid) {
-        if (!options.json) {
-          console.error(chalk.red(`\n❌ SECURITY ERROR: Aborting post_config execution for "${lt.name}" due to blocked commands:`));
-          for (const err of errors) {
-            console.error(chalk.red(`   - ${err}`));
-          }
-        }
-        process.exit(1);
+      
+      for (const err of errors) {
+        allErrors.push({ template: lt.name, error: err });
       }
-
-      if (warnings.length > 0) {
-        if (!options.json) {
-          console.warn(chalk.yellow(`\n⚠️  SECURITY WARNING: Post-config in "${lt.name}" contains dangerous commands:`));
-          for (const warn of warnings) {
-            console.warn(chalk.yellow(`   - ${warn}`));
-          }
+      for (const warn of warnings) {
+        allWarnings.push({ template: lt.name, warning: warn });
+      }
+    }
+    
+    // Handle errors - any blocked command aborts everything
+    if (allErrors.length > 0) {
+      if (!options.json) {
+        console.error(chalk.red(`\n❌ SECURITY ERROR: Aborting post_config execution due to blocked commands:`));
+        for (const { template, error } of allErrors) {
+          console.error(chalk.red(`   [${template}] ${error}`));
         }
-
-        if (!options.yes) {
-          const { proceed } = await inquirer.prompt({
-            type: 'confirm',
-            name: 'proceed',
-            message: chalk.red(`Are you sure you want to run post-config tasks for "${lt.name}"?`),
-            default: false
-          });
-          if (!proceed) {
-            if (!options.json) console.log(chalk.yellow("Post-config tasks aborted by user."));
-            return;
-          }
-        } else if (!options.json) {
-          console.warn(chalk.yellow("Proceeding anyway (non-interactive mode with auto-confirm enabled)."));
+      }
+      process.exit(1);
+    }
+    
+    // Handle warnings - single aggregated prompt for all templates
+    if (allWarnings.length > 0) {
+      if (!options.json) {
+        console.warn(chalk.yellow(`\n⚠️  SECURITY WARNING: Post-config tasks contain dangerous commands:`));
+        for (const { template, warning } of allWarnings) {
+          console.warn(chalk.yellow(`   [${template}] ${warning}`));
         }
+      }
+      
+      if (!options.yes) {
+        const { proceed } = await inquirer.prompt({
+          type: 'confirm',
+          name: 'proceed',
+          message: chalk.red(`Security warnings found in ${new Set(allWarnings.map(w => w.template)).size} template(s). Run post-config tasks anyway?`),
+          default: false
+        });
+        if (!proceed) {
+          if (!options.json) console.log(chalk.yellow("Post-config tasks aborted by user."));
+          return;
+        }
+      } else if (!options.json) {
+        console.warn(chalk.yellow("Proceeding anyway (non-interactive mode with auto-confirm enabled)."));
       }
     }
 
-    let selectedTaskNames: string[] = [];
+    let selectedTaskIds: string[] = [];
 
     if (options.dryRun) {
-      selectedTaskNames = allTasks.map(t => t.command || `./${t.script}` || '');
+      selectedTaskIds = allTasks.map(t => t._id);
       if (!options.json) {
         console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
         for (const t of allTasks) {
           const desc = t.description ? ` (${t.description})` : '';
-          console.log(chalk.gray(`  [template] - ${t.command || `./${t.script}`}${desc}`));
+          const templatesNote = t.templates.length > 1 ? ` [${t.templates.join(', ')}]` : ` [${t.templates[0]}]`;
+          console.log(chalk.gray(`  ${t.command || `./${t.script}`}${desc}${templatesNote}`));
         }
       }
     } else if (options.yes) {
-      selectedTaskNames = allTasks.map(t => t.command || `./${t.script}` || '');
+      selectedTaskIds = allTasks.map(t => t._id);
     } else {
       const choices: Array<{name: string; value: string; checked?: boolean}> = [];
 
       for (const t of allTasks) {
         const cmd = t.command || `./${t.script}` || '(no command)';
         const desc = t.description ? ` (${t.description})` : '';
+        const templatesNote = t.templates.length > 1 ? ` [${t.templates.join(', ')}]` : ` [${t.templates[0]}]`;
         choices.push({
-          name: `${cmd}${desc}`,
-          value: cmd,
+          name: `${cmd}${desc}${templatesNote}`,
+          value: t._id,
           checked: true
         });
       }
@@ -638,10 +668,10 @@ export async function init(
         },
         choices
       });
-      selectedTaskNames = response.selected || [];
+      selectedTaskIds = response.selected || [];
     }
 
-    if (selectedTaskNames.length > 0 && !options.dryRun) {
+    if (selectedTaskIds.length > 0 && !options.dryRun) {
       let bashContent = '#!/bin/bash\n# Auto-generated post_config script\n\n';
       let batContent = '@echo off\n:: Auto-generated post_config script\n\n';
       for (const t of allTasks) {
@@ -651,11 +681,10 @@ export async function init(
         } else if (t.script) {
           cmd = `./${t.script}`;
         }
-        const taskKey = t.command || (t.script ? `./${t.script}` : '');
-        if (selectedTaskNames.includes(taskKey)) {
+        if (selectedTaskIds.includes(t._id)) {
           if (cmd) {
-            bashContent += `echo "Running: ${t.description || taskKey}"\n${cmd}\n`;
-            batContent += `echo Running: ${t.description || taskKey}\n${cmd}\n`;
+            bashContent += `echo "Running: ${t.description || cmd}"\n${cmd}\n`;
+            batContent += `echo Running: ${t.description || cmd}\n${cmd}\n`;
           }
         }
       }

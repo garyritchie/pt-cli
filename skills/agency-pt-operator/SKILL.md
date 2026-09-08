@@ -15,13 +15,14 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
 
 2. **Scaffolding (`pt init`):**
    When a matching template exists, initialize it using the non-interactive flags. URL targets (GitHub, Gitea, etc.) are automatically translated to tarball downloads.
-   - **Command:** `pt init <template_name> <destination_path> --yes`
-   - If the template requires variables, pass them: `pt init <template_name> <destination_path> --yes --vars key1=value1,key2=value2`
+   - **Command:** `pt init <template_name> [template_name2...] <destination_path> --yes`
+   - Multiple templates can be combined: `pt init base-template caddy-addon /path/to/new/PROJECT --yes`
+   - If templates require variables, pass them: `pt init <template_name> [template_name2...] <destination_path> --yes --vars key1=value1,key2=value2`
    - **Direct JSON scaffolding:** To scaffold from a JSON template file without registering it in `config.yaml`:
      `pt init <destination_path> --file <json_path> --yes`
    - *Never* run `pt init` without `--yes`, as interactive prompts will block you.
-   - **Dry-run:** Preview what would be created without making changes: `pt init <template_name> <destination_path> --yes --dry-run`
-   - **Skip post-config:** Skip running post-config tasks: `pt init <template_name> <destination_path> --yes --skip-post-config`
+   - **Dry-run:** Preview what would be created without making changes: `pt init <template_name> [template_name2...] <destination_path> --yes --dry-run`
+   - **Skip post-config:** Skip running post-config tasks: `pt init <template_name> [template_name2...] <destination_path> --yes --skip-post-config`
    - Note any errors from auto-executed post-config tasks (like `npm install` failing) and correct them if necessary.
 
 3. **Capturing Knowledge (`pt learn`):**

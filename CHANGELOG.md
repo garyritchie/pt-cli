@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-09-08
+
+### Added
+
+- **Multi-template task deduplication**: `pt init` now deduplicates post-config tasks across templates by command+description, executing each unique task only once
+- **ID-based task selection**: Internal `_id` fields prevent key collisions when identical commands exist in multiple templates
+
+### Changed
+
+- **Aggregated security warnings**: Single security prompt for all templates (was per-template), preventing early abort when one template has dangerous commands
+- **Template attribution in UI**: Deduplicated tasks show all contributing templates (e.g., `[base-template, addon-template]`)
+
+### Fixed
+
+- Duplicate `git init` execution when multiple templates include the same post-config task
+- Security warning loop that cancelled all templates when user declined one template's post-config
+
+---
+
+## [1.2.0] - 2026-09-04
+
+### Added
+
+- **Modular multi-template initialization**: `pt init <template1> <template2> <target>` combines folders, files, variables, and post-config from multiple templates
+- **Collision handling**: Detects and reports conflicting folder names, file destinations, and variable definitions across templates
+- **Readme renaming**: Auto-renames `README.md` from each template to `README_<template>.md` to prevent overwrites
+
+### Changed
+
+- **Init command accepts multiple templates**: Space-separated template names before target directory
+- **Variable merging**: Template variables merged with collision detection and clear error messages
+
+---
+
+## [1.1.0] - 2026-09-03
+
+### Added
+
+- **Shell completions**: `pt completion <bash|zsh|fish>` generates shell completion scripts
+- **Completion install guidance**: Printed instructions for adding to shell rc files
+
+### Fixed
+
+- **Shell completions interfere with PT-GUI**: Removed auto-install behavior that broke GUI integration; completions now opt-in only
+
+---
+
 ## [1.0.0] - 2026-07-31
 
 ### 🎉 First Stable Release

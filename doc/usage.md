@@ -124,20 +124,37 @@ project=MyProject
 ## Initialize a project
 
 ```bash
-# Initialize from a template (auto-suggests post-config tasks)
-pt init <template_name> /path/to/new/PROJECT
+# Initialize from one or more templates (auto-suggests post-config tasks)
+pt init <template_name> [template_name2...] /path/to/new/PROJECT
 
 # Skip post-config tasks
-pt init <template_name> /path/to/new/PROJECT --skip-post-config
+pt init <template_name> [template_name2...] /path/to/new/PROJECT --skip-post-config
 
 # Dry run (preview actions without execution)
-pt init <template_name> /path/to/new/PROJECT --dry-run
+pt init <template_name> [template_name2...] /path/to/new/PROJECT --dry-run
 
 # Non-interactive mode with variables (useful for an API or AI agents)
-pt init <template_name> /path/to/new/PROJECT --yes --vars project_name=foo,author=bar
+pt init <template_name> [template_name2...] /path/to/new/PROJECT --yes --vars project_name=foo,author=bar
 
 # Initialize directly from a JSON template file (no config.yaml registration)
 pt init /path/to/new/PROJECT --file my-template.json --yes
+```
+
+### Multi-Template Initialization
+
+When you provide multiple template names, `pt` combines them into a single project:
+
+- **Folder structures merged** — duplicate folder names are merged recursively
+- **Variables merged** — duplicate variable names use the last template's defaults
+- **Copy files merged** — files with same destination prompt for collision resolution
+- **Post-config tasks deduplicated** — identical tasks (same command + description) run once, with template attribution shown in selection
+
+```bash
+# Combine base template with addon
+pt init base-template caddy-addon /path/to/new/PROJECT
+
+# Interactive: you'll see one security prompt for all templates, then a unified task list
+# --yes: all deduplicated tasks run automatically
 ```
 
 ### Direct JSON Scaffolding (`--file`)

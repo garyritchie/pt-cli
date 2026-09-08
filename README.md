@@ -26,33 +26,32 @@ graph LR
     RSA -. Update .-> Engine
     
     style Engine fill:#f9f,stroke:#333,stroke-width:2px,color:#000
-
 ```
 
 <!-- TOC -->
 
 - [pt - Project Template CLI](#pt---project-template-cli)
-  - [Why pt-cli?](#why-pt-cli)
-  - [Core Benefits \& Uses](#core-benefits--uses)
-    - [🚀 Low-Friction Templating](#-low-friction-templating)
-    - [🧠 Reduces Cognitive Load](#-reduces-cognitive-load)
-    - [📦 Sharing is Caring](#-sharing-is-caring)
-    - [🤖 Agentic and API Friendly](#-agentic-and-api-friendly)
-  - [Features at a Glance](#features-at-a-glance)
-  - [Quick Start](#quick-start)
-    - [Installation](#installation)
-    - [Basic Commands](#basic-commands)
-    - [Shell Completions](#shell-completions)
-  - [Agent Integration](#agent-integration)
-  - [Documentation](#documentation)
-  - [Development](#development)
-  - [Where are the Templates?](#where-are-the-templates)
-  - [1.0 Release \& API Stability](#10-release--api-stability)
-    - [🔒 Stability Guarantee (1.x series)](#-stability-guarantee-1x-series)
-    - [📦 Versioning Policy](#-versioning-policy)
-    - [📋 What's Locked in 1.0](#-whats-locked-in-10)
-    - [📖 Migration from 0.x to 1.0](#-migration-from-0x-to-10)
-  - [Documentation](#documentation-1)
+    - [Why pt-cli?](#why-pt-cli)
+    - [Core Benefits & Uses](#core-benefits--uses)
+        - [🚀 Low-Friction Templating](#-low-friction-templating)
+        - [🧠 Reduces Cognitive Load](#-reduces-cognitive-load)
+        - [📦 Sharing is Caring](#-sharing-is-caring)
+        - [🤖 Agentic and API Friendly](#-agentic-and-api-friendly)
+    - [Features at a Glance](#features-at-a-glance)
+    - [Quick Start](#quick-start)
+        - [Installation](#installation)
+        - [Basic Commands](#basic-commands)
+        - [Shell Completions](#shell-completions)
+    - [Agent Integration](#agent-integration)
+    - [Documentation](#documentation)
+    - [Development](#development)
+    - [Where are the Templates?](#where-are-the-templates)
+    - [Release & API Stability](#release--api-stability)
+        - [🔒 Stability Guarantee 1.x series](#-stability-guarantee-1x-series)
+        - [📦 Versioning Policy](#-versioning-policy)
+        - [📋 What's Locked in 1.0](#-whats-locked-in-10)
+        - [📖 Migration from 0.x to 1.0](#-migration-from-0x-to-10)
+    - [Documentation](#documentation)
 
 <!-- /TOC -->
 
@@ -60,7 +59,7 @@ graph LR
 
 Traditional project templating often tightly couples logic and configuration, meaning every new template requires code changes. `pt-cli` breaks that ceiling by separating project definitions from the underlying logic.
 
-Instead of writing complex, hard-coded configuration files to scaffold new work, `pt-cli` allows you to **"learn"** from your existing project directories and turn them into  templates. It doesn't enforce a specific folder structure; it supports *your* existing patterns.
+Instead of writing complex, hard-coded configuration files to scaffold new work, `pt-cli` allows you to **learn** from your existing project directories and turn them into  templates. It doesn't enforce a specific folder structure; it supports *your* existing patterns.
 
 ## Core Benefits & Uses
 
@@ -114,8 +113,8 @@ pt learn /path/to/PROJECT
 # Learn a template from a remote repository (e.g. GitHub, Gitea, or path to tarball)
 pt learn https://github.com/garyritchie/pt_godot
 
-# Scaffold a new project from a learned template
-pt init <template_name> /path/to/NEW_PROJECT
+# Scaffold a new project from one or more learned templates
+pt init <template_name> [template_name2...] /path/to/NEW_PROJECT
 
 # List available templates and configurations
 pt config
@@ -128,7 +127,6 @@ pt add my-new-template --file my-new-template.json
 
 # Scaffold directly from a JSON file (no config registration required)
 pt init ./new-project --file my-template.json --yes
-
 ```
 
 ### Shell Completions
@@ -143,6 +141,7 @@ pt completion bash > /etc/bash_completion.d/pt
 # Zsh
 pt completion zsh > ~/.zsh/completions/_pt
 # Add to ~/.zshrc: fpath=(~/.zsh/completions $fpath)
+# autoload -U compinit && compinit
 
 # Fish
 pt completion fish > ~/.config/fish/completions/pt.fish

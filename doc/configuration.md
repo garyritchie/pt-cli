@@ -161,14 +161,16 @@ Each task supports:
 | `script`         | Path to script relative to template root                                         |
 | `cross_platform` | If `true`, use platform-safe runner                                              |
 
-**Interaction flow** during `pt init`:
+**Interaction flow** during `pt init` (single or multiple templates):
 
 1. Folder structure created
-2. If template has `post_config`:
+2. If template(s) have `post_config`:
    - Filter tasks by project type
-   - Show list: `[1/3] git init` ...
-   - Prompt: `Run post-config tasks? (y/N)`
-   - If yes: run each task, show ✓/✗ per task
+   - **Aggregate security check** — all templates' warnings shown in one prompt
+   - If warnings exist: prompt `Security warnings found in N template(s). Run post-config tasks anyway? (y/N)`
+   - Show unified task list with checkboxes (duplicates merged, template attribution shown)
+   - Prompt: `Select post-config tasks to run:`
+   - Run selected tasks, show ✓/✗ per task
 3. If no `post_config`, suggest baked-in defaults:
    - Prompt: `No post-config defined. Use suggested tasks?`
 4. If `--skip-post-config` flag: skip entirely

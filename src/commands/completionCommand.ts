@@ -68,9 +68,28 @@ _pt_completions() {
       if [[ "$cur" == -* ]]; then
         COMPREPLY=( $(compgen -W "-f --file --skip-post-config --dry-run -y --yes --vars --collision --json -h --help" -- "$cur") )
       elif [[ $cword -ge 2 ]]; then
+        # Try template name completion first
         local templates
         templates=$(pt completion --templates 2>/dev/null)
-        COMPREPLY=( $(compgen -W "$templates" -- "$cur") )
+        local template_matches
+        template_matches=$(compgen -W "$templates" -- "$cur")
+        
+        # If we're at a position where destination could be (cword >= 2 for first arg after init,
+        # or cword >= 3 with templates already specified),
+        # also try directory completion. This handles cases like "pt init Base SPA PARK<TAB>"
+        local dir_matches
+        if [[ $cword -ge 2 ]]; then
+          dir_matches=$(compgen -d -- "$cur")
+        fi
+        
+        # Combine matches - template matches first, then directory matches
+        COMPREPLY=()
+        if [[ -n "$template_matches" ]]; then
+          COMPREPLY=( $template_matches )
+        fi
+        if [[ -n "$dir_matches" ]]; then
+          COMPREPLY+=( $dir_matches )
+        fi
       fi
       ;;
     config)
@@ -194,16 +213,16 @@ _pt() {
             '2:sourcePath:_files -/'
           ;;
         init)
-          _arguments \\
-            '(-f --file)'{-f,--file}'[Initialize directly from a JSON template file]:file:_files' \\
-            '--skip-post-config[Skip running post-config tasks]' \\
-            '--dry-run[Show what would be created without making changes]' \\
-            '(-y --yes)'{-y,--yes}'[Automatically answer yes to prompts]' \\
-            '--vars=[Comma-separated key=value variables]:variables:' \\
-            '--collision=[File collision resolution strategy]:mode:(overwrite newest)' \\
-            '--json[Output result as JSON]' \\
-            '(-h --help)'{-h,--help}'[display help for command]' \\
-            '*:templates:_pt_templates'
+          _arguments \
+            '(-f --file)'{-f,--file}'[Initialize directly from a JSON template file]:file:_files' \
+            '--skip-post-config[Skip running post-config tasks]' \
+            '--dry-run[Show what would be created without making changes]' \
+            '(-y --yes)'{-y,--yes}'[Automatically answer yes to prompts]' \
+            '--vars=[Comma-separated key=value variables]:variables:' \
+            '--collision=[File collision resolution strategy]:mode:(overwrite newest)' \
+            '--json[Output result as JSON]' \
+            '(-h --help)'{-h,--help}'[display help for command]' \
+            '*: :(_pt_templates _directories)'
           ;;
         config)
           _arguments \\
@@ -325,6 +344,7 @@ complete -c pt -n '__fish_pt_using_command update' -l no-diff -d 'Disable additi
 
 # init
 complete -c pt -n '__fish_pt_using_command init' -a '(__fish_pt_templates)' -d 'Template name'
+complete -c pt -n '__fish_pt_using_command init' -F -d 'Target directory' --wraps=pt --condition=__fish_pt_init_dir
 complete -c pt -n '__fish_pt_using_command init' -s f -l file -d 'Initialize directly from a JSON template file without adding it to local config'
 complete -c pt -n '__fish_pt_using_command init' -l skip-post-config -d 'Skip running post-config tasks'
 complete -c pt -n '__fish_pt_using_command init' -l dry-run -d 'Show what would be created without making changes'
@@ -332,6 +352,20 @@ complete -c pt -n '__fish_pt_using_command init' -s y -l yes -d 'Automatically a
 complete -c pt -n '__fish_pt_using_command init' -l vars -d 'Comma-separated key=value variables'
 complete -c pt -n '__fish_pt_using_command init' -l collision -a 'overwrite newest' -d 'File collision resolution strategy'
 complete -c pt -n '__fish_pt_using_command init' -l json -d 'Output result as JSON'
+
+# Helper function for init directory completion (only when last positional arg looks like a path)
+function __fish_pt_init_dir
+    set -l cmd (commandline -opc)
+    # Count non-flag positional arguments after 'init'
+    set -l args (string match -r '(^[^ ]+ )?init( .+)?' <<< "$cmd")
+    # Simple approach: if the current token contains / or starts with ~ or ., complete as directory
+    set -l cur (commandline -ct)
+    if string match -q '*/' "$cur"; or string match -q '~*' "$cur"; or string match -q '.*' "$cur"
+        return 0
+    else
+        return 1
+    end
+end
 
 # config
 complete -c pt -n '__fish_pt_using_command config' -a '(__fish_pt_templates)' -d 'Template name'

@@ -21,7 +21,7 @@ export function substituteVariables(
   // Keep expanding until no more placeholders remain or we hit the limit
   while (/\{\{[^}]+\}\}/.test(result) && iteration < maxIterations) {
     // Use a more complex regex that captures the full placeholder including spaces
-    result = result.replace(/(\{\{\s*)(\w+)(\s*\}\})/g, (_, prefix, varName, suffix) => {
+    result = result.replace(/(\{\{\s*)([a-zA-Z0-9_-]+)(\s*\}\})/g, (_, prefix, varName, suffix) => {
       const val = variables[varName];
       // If variable not found, leave placeholder as-is with original spacing
       if (val === undefined) {

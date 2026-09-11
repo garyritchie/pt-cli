@@ -349,27 +349,27 @@ export async function init(
   const mergedVarsDef = mergeVariables(loadedTemplates);
   let variables: Record<string, string> = {};
 
+  // Scan parent directories for .env files and pre-fill variables
+  const envVars = scanEnvForVariables(resolvedDest);
+  if (Object.keys(envVars).length > 0) {
+    for (const [key, value] of Object.entries(envVars)) {
+      if (!variables[key]) {
+        variables[key] = value;
+      }
+    }
+  }
+
+  if (options.vars) {
+    const pairs = options.vars.split(',').map((p: string) => p.trim());
+    for (const pair of pairs) {
+      const [k, ...v] = pair.split('=');
+      if (k && v.length > 0) {
+        variables[k.trim()] = v.join('=').trim();
+      }
+    }
+  }
+
   if (mergedVarsDef.length > 0) {
-    // Scan parent directories for .env files and pre-fill variables
-    const envVars = scanEnvForVariables(resolvedDest);
-    if (Object.keys(envVars).length > 0) {
-      for (const [key, value] of Object.entries(envVars)) {
-        if (!variables[key]) {
-          variables[key] = value;
-        }
-      }
-    }
-
-    if (options.vars) {
-      const pairs = options.vars.split(',').map((p: string) => p.trim());
-      for (const pair of pairs) {
-        const [k, ...v] = pair.split('=');
-        if (k && v.length > 0) {
-          variables[k.trim()] = v.join('=').trim();
-        }
-      }
-    }
-
     if (!options.yes) {
       for (const v of mergedVarsDef) {
         if (!variables[v.name]) {
@@ -398,6 +398,12 @@ export async function init(
           }
         }
       }
+    }
+  }
+
+  if (Object.keys(variables).length > 0) {
+    for (const [key, val] of Object.entries(variables)) {
+      variables[key] = substituteVariables(val, variables);
     }
   }
 
@@ -509,7 +515,7 @@ export async function init(
           }
 
           let fileContent = fs.readFileSync(srcPath, 'utf-8');
-          if (mergedVarsDef.length > 0) {
+          if (Object.keys(variables).length > 0) {
             fileContent = substituteVariables(fileContent, variables);
           }
 
@@ -554,6 +560,17 @@ export async function init(
   for (const lt of loadedTemplates) {
     if (lt.template.post_config) {
       for (const t of lt.template.post_config) {
+        if (Object.keys(variables).length > 0) {
+          if (t.command) {
+            t.command = substituteVariables(t.command, variables);
+          }
+          if (t.description) {
+            t.description = substituteVariables(t.description, variables);
+          }
+          if (t.script) {
+            t.script = substituteVariables(t.script, variables);
+          }
+        }
         if (!t.type || t.type === lt.name) {
           const key = `${t.command || t.script || ''}|${t.description || ''}`;
           if (taskMap.has(key)) {
@@ -723,6 +740,9 @@ export async function init(
 }
 
 function createStructure(dirPath: string, folders: FolderNode[], dryRun: boolean = false, silent: boolean = false) {
+  if (!dryRun) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
   for (const folder of folders) {
     const fullDirPath = path.join(dirPath, sanitizePath(folder.name));
 

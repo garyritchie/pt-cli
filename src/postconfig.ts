@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { PostConfigTask } from './config.js';
+import { substituteVariables } from './substitute.js';
 import {
   isBlockedCommand,
   isDangerousCommand,
@@ -28,7 +29,8 @@ export async function runPostConfig(
   destPath: string,
   tasks: PostConfigTask[],
   projectType: string,
-  options: PostConfigOptions = {}
+  options: PostConfigOptions = {},
+  variables: Record<string, string> = {}
 ): Promise<void> {
   if (options.skipPostConfig) return;
 
@@ -42,8 +44,15 @@ export async function runPostConfig(
     return;
   }
 
-  // 1. Filter tasks by type
-  const applicableTasks = tasks.filter(t => !t.type || t.type === projectType);
+  // 1. Filter tasks by type and substitute variables
+  const applicableTasks = tasks
+    .filter(t => !t.type || t.type === projectType)
+    .map(t => ({
+      ...t,
+      command: t.command && Object.keys(variables).length > 0 ? substituteVariables(t.command, variables) : t.command,
+      description: t.description && Object.keys(variables).length > 0 ? substituteVariables(t.description, variables) : t.description,
+      script: t.script && Object.keys(variables).length > 0 ? substituteVariables(t.script, variables) : t.script,
+    }));
 
   if (applicableTasks.length === 0) {
     return;

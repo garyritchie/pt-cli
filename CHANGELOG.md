@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-09-11
+
+### Added
+
+- **Post-config variable substitution**: `pt init` now substitutes template variables into `post_config` commands, scripts, and descriptions.
+- **Hyphenated variable name support**: `substituteVariables` now supports variable names containing hyphens (`[a-zA-Z0-9_-]+`).
+
+### Changed
+
+- Variable pre-filling from parent `.env` files and `--vars` CLI flags is now performed even when templates do not explicitly define a `variables` block.
+- Post-config security validation checks substituted commands, properly catching dangerous or blocked commands resolved from variables.
+- Project destination directory is guaranteed to be created even when templates contain no folder nodes.
+
+---
+
 ## [1.3.0] - 2026-09-08
 
 ### Added

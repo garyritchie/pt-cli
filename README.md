@@ -31,27 +31,26 @@ graph LR
 <!-- TOC -->
 
 - [pt - Project Template CLI](#pt---project-template-cli)
-    - [Why pt-cli?](#why-pt-cli)
-    - [Core Benefits & Uses](#core-benefits--uses)
-        - [🚀 Low-Friction Templating](#-low-friction-templating)
-        - [🧠 Reduces Cognitive Load](#-reduces-cognitive-load)
-        - [📦 Sharing is Caring](#-sharing-is-caring)
-        - [🤖 Agentic and API Friendly](#-agentic-and-api-friendly)
-    - [Features at a Glance](#features-at-a-glance)
-    - [Quick Start](#quick-start)
-        - [Installation](#installation)
-        - [Basic Commands](#basic-commands)
-        - [Shell Completions](#shell-completions)
-    - [Agent Integration](#agent-integration)
-    - [Documentation](#documentation)
-    - [Development](#development)
-    - [Where are the Templates?](#where-are-the-templates)
-    - [Release & API Stability](#release--api-stability)
-        - [🔒 Stability Guarantee 1.x series](#-stability-guarantee-1x-series)
-        - [📦 Versioning Policy](#-versioning-policy)
-        - [📋 What's Locked in 1.0](#-whats-locked-in-10)
-        - [📖 Migration from 0.x to 1.0](#-migration-from-0x-to-10)
-    - [Documentation](#documentation)
+  - [Why pt-cli?](#why-pt-cli)
+  - [Core Benefits & Uses](#core-benefits--uses)
+    - [🚀 Low-Friction Templating](#-low-friction-templating)
+    - [🧠 Reduces Cognitive Load](#-reduces-cognitive-load)
+    - [📦 Sharing is Caring](#-sharing-is-caring)
+    - [🤖 Agentic and API Friendly](#-agentic-and-api-friendly)
+  - [Features at a Glance](#features-at-a-glance)
+  - [Quick Start](#quick-start)
+    - [Installation](#installation)
+    - [Basic Commands](#basic-commands)
+    - [Shell Completions](#shell-completions)
+  - [Agent Integration](#agent-integration)
+  - [Documentation](#documentation)
+  - [Development](#development)
+  - [Where are the Templates?](#where-are-the-templates)
+  - [Release & API Stability](#release--api-stability)
+    - [🔒 Stability Guarantee (1.x series)](#-stability-guarantee-1x-series)
+    - [📦 Versioning Policy](#-versioning-policy)
+    - [📋 What's Locked in 1.0](#-whats-locked-in-10)
+    - [📖 Migration from 0.x to 1.0](#-migration-from-0x-to-10)
 
 <!-- /TOC -->
 
@@ -86,12 +85,15 @@ Prefer a graphical interface, an [official GUI](https://garylritchie.gumroad.com
 
 ## Features at a Glance
 
-* **Learn Any Structure:** Learn any directory structure and save it as a reusable template.
-* **Remote Templates:** Learn templates directly from a remote repository or archive URL.
-* **Variable Injection:** Define template variables for dynamic file customization. Automatically scans text files for `{{ var }}` syntax during `learn`/`update`.
-* **Automated Setup:** Auto-detect and suggest post-config setup tasks (e.g., `npm install`, `git init`, Python virtual environments).
-* **Global Configuration:** Configure global post-config tasks in `~/.pt/config.yaml` to apply them to all projects automatically.
-* **Direct Scaffolding:** Initialize projects directly from a JSON file without registering them in your config.
+- **Learn Any Structure**: Learn any directory structure and save it as a reusable template.
+- **Remote Templates**: Learn templates directly from a remote repository or archive URL.
+- **Variable Injection**: Define template variables for dynamic file customization. Automatically scans text files for `{{ var }}` syntax during `learn`/`update`.
+- **Automated Setup**: Auto-detect and suggest post-config setup tasks (e.g., `npm install`, `git init`, Python virtual environments).
+- **Global Configuration**: Configure global post-config tasks in `~/.pt/config.yaml` to apply them to all projects automatically.
+- **Direct Scaffolding**: Initialize projects directly from a JSON file without registering them in your config.
+- **Multi-Template Initialization**: Initialize from multiple templates at once (`pt init base addon my-project`), combining folders, files, variables, and post-config with collision detection and README auto-renaming.
+- **Task Deduplication**: Post-config tasks with identical command+description are deduplicated across templates, executing each unique task only once with a single security prompt.
+- **Post-Config Variable Support**: `pt init` now substitutes template variables into `post_config` commands, scripts, and descriptions; variable pre-filling from `.env` files and `--vars` CLI flags even when templates don't define a `variables` block; hyphenated variable name support (`[a-zA-Z0-9_-]+`).
 
 ## Quick Start
 
@@ -161,7 +163,10 @@ Equipping your agent with this skill allows it to automatically use `pt-cli` to 
 
 * **[Detailed Usage](doc/usage.md)** - Learn, Initialize, Update, and Remove commands.
 * **[Configuration Guide](doc/configuration.md)** - Template variables, post-config tasks, file copying, and more.
-* **[Exclusions](doc/exclusions.md)** - Learn about default ignored files and how to set custom patterns.
+* **[Security Guide](doc/security.md)** - Command validation, trusted sources, audit logging.
+* **[Testing Guide](doc/testing.md)** - Test suite structure and running tests.
+* **[Exclusions Reference](doc/exclusions.md)** - Default ignored files and custom patterns.
+* **[Variable Substitution Example](doc/variable_substitution_example.md)** - Practical examples.
 
 ## Development
 
@@ -184,7 +189,7 @@ Because `pt-cli` is built around flexibility, the app purposefully avoids imposi
 * **[Example Templates](https://github.com/search?q=topic%3Atemplate-project+org%3Agaryritchie&type=Repositories):** We have provided a few templates based on our own workflows to get you started. These include helpful Python scripts for streamlining common tasks, such as downloading the latest version of Blender or pruning unused folders from a project.
 * **[Share Your Own](https://github.com/garyritchie/pt-cli/discussions):** Have you built a project structure that works perfectly for your niche? Join us in GitHub Discussions to share your templates and see how others are organizing their work.
 
-## 1.0 Release & API Stability
+## Release & API Stability
 
 **pt-cli v1.0.0** marks the first stable release with a locked public API. This means:
 
@@ -270,14 +275,3 @@ If you're upgrading from a 0.x version:
 - `.env` file scanning for defaults (v0.36+)
 
 If you skipped intermediate 0.x versions, the auto-migration handles everything.
-
----
-
-## Documentation
-
-* **[Detailed Usage](doc/usage.md)** - Learn, Initialize, Update, and Remove commands.
-* **[Configuration Guide](doc/configuration.md)** - Template variables, post-config tasks, file copying, and more.
-* **[Security Guide](doc/security.md)** - Command validation, trusted sources, audit logging.
-* **[Testing Guide](doc/testing.md)** - Test suite structure and running tests.
-* **[Exclusions Reference](doc/exclusions.md)** - Default ignored files and custom patterns.
-* **[Variable Substitution Example](doc/variable_substitution_example.md)** - Practical examples.

@@ -1,6 +1,6 @@
 ---
 name: agency-pt-operator
-description: Specialist in using pt-cli to scaffold project templates, capture boilerplate, and maintain standardized directory structures. Includes knowledge of default_post_config, global variables, automatic variable detection, JSON template configs, and portable template workflows.
+description: Specialist in using pt-cli to scaffold project templates, capture boilerplate, and maintain standardized directory structures. Includes knowledge of default_post_config, global variables, automatic variable detection, JSON template configs, modular multi-template initialization, collision handling, task deduplication, and post-config variable support.
 ---
 
 # `pt-cli` Operator Skill
@@ -17,6 +17,9 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
    When a matching template exists, initialize it using the non-interactive flags. URL targets (GitHub, Gitea, etc.) are automatically translated to tarball downloads.
    - **Command:** `pt init <template_name> [template_name2...] <destination_path> --yes`
    - Multiple templates can be combined: `pt init base-template caddy-addon /path/to/new/PROJECT --yes`
+   - **Modular multi-template initialization** (v1.2+): Templates are processed in order; later templates can override earlier ones with deterministic collision resolution
+   - **Collision handling** (v1.2+): Last template wins for files/folders; README.md auto-renamed to `README_<template>.md` to prevent overwrites; variables merged with collision detection
+   - **Task deduplication** (v1.3+): Post-config tasks with identical `command` + `description` are deduplicated across templates, executing each unique task only once with a single security prompt; `_id` fields prevent key collisions
    - If templates require variables, pass them: `pt init <template_name> [template_name2...] <destination_path> --yes --vars key1=value1,key2=value2`
    - **Direct JSON scaffolding:** To scaffold from a JSON template file without registering it in `config.yaml`:
      `pt init <destination_path> --file <json_path> --yes`
@@ -25,7 +28,13 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
    - **Skip post-config:** Skip running post-config tasks: `pt init <template_name> [template_name2...] <destination_path> --yes --skip-post-config`
    - Note any errors from auto-executed post-config tasks (like `npm install` failing) and correct them if necessary.
 
-3. **Capturing Knowledge (`pt learn`):**
+   ### New in 1.4+: Post-Config Variable Support
+   - `pt init` now substitutes template variables into `post_config` commands, scripts, and descriptions
+   - Variable pre-filling from parent `.env` files and `--vars` CLI flags now performed even when templates do not explicitly define a `variables` block
+   - Post-config security validation checks substituted commands, properly catching dangerous or blocked commands resolved from variables
+   - **Hyphenated variable name support**: `substituteVariables` now supports variable names containing hyphens (`[a-zA-Z0-9_-]+`)
+
+3. **Capturing Knowledge (`pt learn`):****
    If you spend time establishing a new, complex directory structure or configuration (e.g., a specific flavor of an Express backend with testing hooks), save it! Remote URLs (GitHub, Gitea, etc.) are automatically translated to tarball downloads.
    - **Command:** `pt learn <source_path> --name <template_name> --desc "<Description>" --yes`
    - **Update existing template:** Update an existing template with new structure/files: `pt update <template_name> <source_path> --yes`.

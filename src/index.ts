@@ -17,6 +17,7 @@ import { removeCommand } from './commands/removeCommand.js';
 import { defaultPostConfigCommand } from './commands/defaultPostConfigCommand.js';
 import { securityResponseCommand } from './commands/securityResponseCommand.js';
 import { completionCommand } from './commands/completionCommand.js';
+import { setConfigPathOverride } from './config.js';
 
 import pkg from '../package.json' with { type: 'json' };
 
@@ -26,6 +27,18 @@ program
   .name('pt')
   .description('Project Template CLI - Learn project structures and initialize new ones')
   .version(pkg.version, '-v, --version', 'output the version number');
+
+program
+  .option('-c, --config <path>', 'Use a custom config file instead of ~/.pt/config.yaml (place before the command, e.g. pt --config ./team.yaml learn)');
+
+// Resolve the custom config location before any command runs.
+// Omitted flag leaves the default untouched (v1.x API unchanged).
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  const opts = actionCommand.optsWithGlobals();
+  if (opts.config) {
+    setConfigPathOverride(opts.config);
+  }
+});
 
 program
   .command('learn [path]')

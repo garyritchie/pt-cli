@@ -40,10 +40,16 @@ _pt_completions() {
   # Complete top-level command or global flags
   if [[ $cword -eq 1 ]]; then
     if [[ "$cur" == -* ]]; then
-      COMPREPLY=( $(compgen -W "-v --version -h --help" -- "$cur") )
+      COMPREPLY=( $(compgen -W "-v --version -c --config -h --help" -- "$cur") )
     else
       COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
     fi
+    return 0
+  fi
+
+  # Complete the config file path after -c/--config wherever it appears
+  if [[ "$prev" == "-c" || "$prev" == "--config" ]]; then
+    COMPREPLY=( $(compgen -f -- "$cur") )
     return 0
   fi
 
@@ -166,6 +172,7 @@ _pt() {
 
   _arguments -C \\
     '(-v --version)'{-v,--version}'[output the version number]' \\
+    '(-c --config)'{-c,--config}'[Use a custom config file]:path:_files' \\
     '(-h --help)'{-h,--help}'[display help for command]' \\
     '1: :->command' \\
     '*:: :->args'
@@ -311,6 +318,7 @@ end
 
 # Global options
 complete -c pt -n '__fish_pt_needs_command' -s v -l version -d 'output the version number'
+complete -c pt -n '__fish_pt_needs_command' -s c -l config -r -F -d 'Use a custom config file'
 complete -c pt -n '__fish_pt_needs_command' -s h -l help -d 'display help for command'
 
 # Commands

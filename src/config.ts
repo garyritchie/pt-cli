@@ -10,7 +10,21 @@ export function getHomeDir(): string {
 }
 
 export function getConfigPath(): string {
-  return path.join(getHomeDir(), 'config.yaml');
+  return configPathOverride ?? path.join(getHomeDir(), 'config.yaml');
+}
+
+// Custom config file override, set via the global `-c, --config <path>` flag.
+// Null (the default) means the standard ~/.pt/config.yaml location.
+let configPathOverride: string | null = null;
+
+export function setConfigPathOverride(p: string | null | undefined): void {
+  if (!p) {
+    configPathOverride = null;
+    return;
+  }
+  // Resolve once, against the cwd at invocation time: GUI launches and
+  // scripts must not depend on later working-directory changes.
+  configPathOverride = path.resolve(p);
 }
 
 export interface FolderNode {
@@ -70,8 +84,9 @@ export interface PtConfig {
 }
 
 export function ensureConfigDir() {
-  if (!fs.existsSync(getHomeDir())) {
-    fs.mkdirSync(getHomeDir(), { recursive: true });
+  const dir = path.dirname(getConfigPath());
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 }
 
@@ -93,7 +108,15 @@ export function loadConfig(): PtConfig {
   try {
     const content = fs.readFileSync(getConfigPath(), 'utf-8');
     if (!content.trim()) {
-      throw new Error("Config file is empty");
+      // A blank file carries no information: treat it like a missing file
+      // and start fresh instead of failing. Non-empty but unparsable files
+      // still error out below, so real corruption keeps its guard.
+      return {
+        version: '3.0',
+        templates: {},
+        default_post_config: [],
+        variables: []
+      };
     }
     const config: PtConfig = YAML.parse(content);
     

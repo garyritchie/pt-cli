@@ -90,6 +90,7 @@ Prefer a graphical interface, an [official GUI](https://garylritchie.gumroad.com
 - **Variable Injection**: Define template variables for dynamic file customization. Automatically scans text files for `{{ var }}` syntax during `learn`/`update`.
 - **Automated Setup**: Auto-detect and suggest post-config setup tasks (e.g., `npm install`, `git init`, Python virtual environments).
 - **Global Configuration**: Configure global post-config tasks in `~/.pt/config.yaml` to apply them to all projects automatically.
+- **Custom Config Location**: Point any command at a different config file with `pt --config <path>` (e.g. per-project or classroom libraries). Omitted flag uses `~/.pt/config.yaml` as always.
 - **Direct Scaffolding**: Initialize projects directly from a JSON file without registering them in your config.
 - **Multi-Template Initialization**: Initialize from multiple templates at once (`pt init base addon my-project`), combining folders, files, variables, and post-config with collision detection and README auto-renaming.
 - **Task Deduplication**: Post-config tasks with identical command+description are deduplicated across templates, executing each unique task only once with a single security prompt.
@@ -130,6 +131,16 @@ pt add my-new-template --file my-new-template.json
 # Scaffold directly from a JSON file (no config registration required)
 pt init ./new-project --file my-template.json --yes
 ```
+
+### Custom Config Location
+
+```bash
+# Work on a project-local config instead of ~/.pt/config.yaml
+pt --config ./team.yaml learn /path/to/PROJECT --yes --name site
+pt --config ./team.yaml config   # reports the effective file
+```
+
+The flag goes before the command. Relative paths resolve against the working directory. Without it, everything behaves exactly as before.
 
 ### Shell Completions
 
@@ -224,6 +235,8 @@ pt ignore [patterns] [--set]
 pt security-response <response>
 pt completion <shell>
 ```
+
+Global flags (place before the command): `-v, --version`, `-c, --config <path>` (custom config file, default `~/.pt/config.yaml`).
 
 **Config Schema (`~/.pt/config.yaml` v3.0):**
 ```yaml

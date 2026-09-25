@@ -372,29 +372,14 @@ test('saveConfig with empty config file', () => {
     fs.mkdirSync(getHomeDir(), { recursive: true });
   }
 
-  // Create empty config file
+  // Create empty config file: a blank file carries no information, so
+  // loadConfig treats it like a missing file and returns a fresh default
+  // instead of exiting.
   fs.writeFileSync(getConfigPath(), '');
-  
-  // loadConfig calls process.exit(1) on error, so we need to mock it
-  // to prevent the test runner from dying
-  let exitCalled = false;
-  let exitCode: number | undefined;
-  const originalExit = process.exit;
-  process.exit = ((code?: number) => {
-    exitCalled = true;
-    exitCode = code;
-    throw new Error('process.exit called');
-  }) as any;
 
-  try {
-    loadConfig();
-    assert.fail('loadConfig should have called process.exit');
-  } catch (e) {
-    assert.ok(exitCalled, 'process.exit should have been called');
-    assert.strictEqual(exitCode, 1, 'Should exit with code 1');
-  } finally {
-    process.exit = originalExit;
-  }
+  const loaded = loadConfig();
+  assert.deepStrictEqual(Object.keys(loaded.templates), [], 'blank file starts with no templates');
+  assert.strictEqual(loaded.version, '3.0', 'blank file yields a fresh v3.0 default');
 
   // Clean up
   if (fs.existsSync(getConfigPath())) {

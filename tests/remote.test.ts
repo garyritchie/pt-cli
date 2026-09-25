@@ -108,3 +108,42 @@ test('downloadAndExtract: isTrustedSource integrates correctly', async () => {
 });
 
 cleanup(testHome);
+
+test('downloadAndExtract: fetches direct .pt-template.json URLs', async (t) => {
+  const http = await import('node:http');
+  const body = JSON.stringify({
+    description: 'JSON served template',
+    folders: [{ name: 'SRC', info: '' }]
+  });
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(body);
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { server.close(); });
+  const port = (server.address() as any).port;
+  const staged = await downloadAndExtract(
+    `http://127.0.0.1:${port}/lrl_godot.pt-template.json`, false, true
+  );
+  t.after(() => { cleanup(staged); });
+  const stagedFile = path.join(staged, '.pt-template.json');
+  assert.ok(fs.existsSync(stagedFile), 'template JSON should be staged for learn');
+  const parsed = JSON.parse(fs.readFileSync(stagedFile, 'utf-8'));
+  assert.strictEqual(parsed.description, 'JSON served template');
+  assert.deepStrictEqual(parsed.folders, [{ name: 'SRC', info: '' }]);
+});
+
+test('downloadAndExtract: rejects JSON URLs without a folders array', async (t) => {
+  const http = await import('node:http');
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ hello: 'world' }));
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { server.close(); });
+  const port = (server.address() as any).port;
+  await assert.rejects(
+    downloadAndExtract(`http://127.0.0.1:${port}/nope.pt-template.json`, false, true),
+    /no folders array/
+  );
+});

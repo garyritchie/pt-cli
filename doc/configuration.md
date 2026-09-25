@@ -8,6 +8,19 @@ Config is stored at `~/.pt/config.yaml` and contains:
 - `ignore`: Global folder ignore patterns for `pt learn`
 - `variables`: Global variable suggestions for `pt learn` (name, prompt, default, required)
 
+## Custom config location
+
+Pass `-c, --config <path>` before any command to operate on a different config file instead of `~/.pt/config.yaml`:
+
+```bash
+pt --config ./team.yaml learn /path/to/project --yes --name site
+pt --config ./team.yaml config
+```
+
+Relative paths resolve against the working directory at invocation time. Omitting the flag uses the default location exactly as before. `pt config` always prints the effective file under "Config Location". Useful for per-project or classroom template libraries, and for testing without touching your own config.
+
+A missing or blank file starts fresh (no templates); only a non-empty, unparsable file errors out.
+
 ## Security Policy
 
 Please see [[security]].

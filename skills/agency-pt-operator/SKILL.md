@@ -7,6 +7,8 @@ description: Specialist in using pt-cli to scaffold project templates, capture b
 
 As an agent equipped with this skill, you have the ability to rapidly scaffold, manage, and learn project templates using the `pt-cli` tool. You must use this capability whenever you are asked to start a new project or establish a complex boilerplate structure.
 
+**Custom config location (v1.5+):** Prefix any command with `--config <path>` to operate on a different config file instead of `~/.pt/config.yaml` (e.g. `pt --config ./team.yaml init site ./out --yes`). When working inside a project that carries its own config file, pass the flag on every invocation. Omitting it uses the default location.
+
 ## Core Directives
 
 1. **Discovery First:**
@@ -253,6 +255,7 @@ For more details, see the [Security Guide](security.md).
 | `pt update <template> [path]` | Update an existing template (additive difference mode by default, use --no-diff for full mode) |
 | `pt init [template] [dest]` | Initialize a new project from a learned template |
 | `pt config [template]` | Show current config location and list templates, or export a specific template |
+| `pt --config <path> <command>` | Run any command against a custom config file (default `~/.pt/config.yaml`) |
 | `pt variables [pairs]` | View or set global variables (comma-separated key=value) |
 | `pt default-post-config` | View or set default post-config tasks |
 | `pt add <name> [json]` | Import/add a template from a JSON string or file |

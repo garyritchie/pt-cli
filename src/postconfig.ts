@@ -1,10 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 import { execSync } from 'child_process';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { PostConfigTask } from './config.js';
+import { PostConfigTask, getConfigPath } from './config.js';
 import { substituteVariables } from './substitute.js';
 import {
   isBlockedCommand,
@@ -35,7 +32,7 @@ export async function runPostConfig(
   if (options.skipPostConfig) return;
 
   // Load security policy
-  const configPath = path.join(process.env.HOME || os.homedir(), '.pt', 'config.yaml');
+  const configPath = getConfigPath();
   const securityPolicy = getSecurityPolicy(configPath);
 
   // Check rate limiting

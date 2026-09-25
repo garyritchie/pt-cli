@@ -188,7 +188,7 @@ Because `pt-cli` is built around flexibility, the app purposefully avoids imposi
 
 * **[Example Templates](https://github.com/search?q=topic%3Atemplate-project+org%3Agaryritchie&type=Repositories):** We have provided a few templates based on our own workflows to get you started. These include helpful Python scripts for streamlining common tasks, such as downloading the latest version of Blender or pruning unused folders from a project.
 * **[Share Your Own](https://github.com/garyritchie/pt-cli/discussions):** Have you built a project structure that works perfectly for your niche? Join us in GitHub Discussions to share your templates and see how others are organizing their work.
-* **[Learn from the Pros](https://pt-wizard.lyonritchie.com/):** Explore project folder structures based on examples from fellow professionals across creative industries.
+* **[Learn from the Pros](https://pt-gallery.lyonritchie.com/):** Explore project folder structures based on examples from fellow professionals across creative industries.
 
 ## Release & API Stability
 

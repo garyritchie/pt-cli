@@ -41,6 +41,7 @@ graph LR
   - [Quick Start](#quick-start)
     - [Installation](#installation)
     - [Basic Commands](#basic-commands)
+    - [Custom Config Location](#custom-config-location)
     - [Shell Completions](#shell-completions)
   - [Agent Integration](#agent-integration)
   - [Documentation](#documentation)
@@ -72,7 +73,7 @@ Standardization is key to lowering the friction of starting new work. By ensurin
 
 ### 📦 Sharing is Caring
 
-Templates can be exported as JSON configuration files via `pt config <name> --json > .pt-template.json`. This exports the template's structure (folders, files to copy), variables, and post-config tasks — but *not* the actual file contents.
+Templates can be exported as JSON configuration files via `pt config <name> --json > .pt-template.json`. This exports the template's structure (folders, folder info, files to copy), variables, and post-config tasks — but *not* the actual file contents.
 
 For fully self-contained distribution, commit the template's source directory alongside its JSON config.
 
@@ -80,7 +81,7 @@ For fully self-contained distribution, commit the template's source directory al
 
 `pt-cli` fully supports headless operation via non-interactive flags (`--yes`, `--vars`). It includes an official operator skill, allowing AI agents to autonomously lay down standardized boilerplate and capture new architectures you develop together. 
 
-Prefer a graphical interface, an [official GUI](https://garylritchie.gumroad.com/l/pt-gui) is available.
+Prefer a graphical interface? An [official GUI](https://garylritchie.gumroad.com/l/pt-gui) is available.
 
 
 ## Features at a Glance
@@ -195,7 +196,7 @@ Equipping your agent with this skill allows it to automatically use `pt-cli` to 
 
 The way you organize your workspace is highly personal. A folder hierarchy that makes perfect sense for a VFX pipeline might look entirely backwards for a company branding project.
 
-Because `pt-cli` is built around flexibility, the app purposefully avoids imposing [strong opinions](https://lyonritchie.com/lab/project-template-cli) or hardcoded structures out of the box. Instead, it empowers you to learn and share exactly what works for your specific needs.
+Because `pt-cli` is built around flexibility, the app purposefully avoids imposing [opinions](https://lyonritchie.com/lab/project-template-cli) or hardcoded structures out of the box. Instead, it empowers you to learn and share exactly what works for your specific needs.
 
 * **[Example Templates](https://github.com/search?q=topic%3Atemplate-project+org%3Agaryritchie&type=Repositories):** We have provided a few templates based on our own workflows to get you started. These include helpful Python scripts for streamlining common tasks, such as downloading the latest version of Blender or pruning unused folders from a project.
 * **[Share Your Own](https://github.com/garyritchie/pt-cli/discussions):** Have you built a project structure that works perfectly for your niche? Join us in GitHub Discussions to share your templates and see how others are organizing their work.

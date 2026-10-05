@@ -489,3 +489,40 @@ test('init with copy_files copies directory recursively', async () => {
 
   cleanup(projectDest, templateRoot, testHome);
 });
+
+test('init prefers config template over same-named file in cwd', async () => {
+  // Regression test: a bare name matching a config template must resolve to
+  // the config entry even when a same-named (non-JSON) file exists in the
+  // process working directory. Previously fs.existsSync hijacked the name and
+  // init died with "Failed to read/parse template file".
+  const projectDest = path.join(process.cwd(), 'test-collide-project');
+  const collidingFile = path.join(process.cwd(), 'collide-me');
+  cleanup(projectDest, collidingFile);
+  fs.writeFileSync(collidingFile, '`not json');
+
+  setupTestConfig('collide-me', {
+    description: 'Config entry wins over cwd file',
+    folders: [{ name: 'src', info: '' }]
+  });
+
+  // Mock process.exit so a regression fails the test instead of killing the runner
+  let exitCalled = false;
+  const originalExit = process.exit;
+  process.exit = ((code?: number) => {
+    exitCalled = true;
+    throw new Error('process.exit called');
+  }) as any;
+
+  try {
+    await init(['collide-me', projectDest], {
+      yes: true,
+      dryRun: true,
+      skipPostConfig: true
+    });
+    assert.ok(!exitCalled, 'process.exit should not have been called');
+  } finally {
+    process.exit = originalExit;
+  }
+
+  cleanup(projectDest, collidingFile, testHome);
+});

@@ -255,8 +255,16 @@ export async function init(
   // Load each template configuration
   const loadedTemplates: LoadedTemplate[] = [];
   for (const item of rawTemplates) {
-    // Check if item is a local json file path or exists on disk
-    if (item.endsWith('.json') || fs.existsSync(item)) {
+    // A bare name that matches a config template always resolves to the
+    // config entry: a same-named file in the process working directory must
+    // never hijack it. GUI and CLI run with different cwds, which made the
+    // old existsSync-first check order-dependent and broke GUI multi-template
+    // init with "Failed to read/parse template file". Files are used only for
+    // explicit paths / .json names, or as a fallback when no config template
+    // matches (preserving direct `pt init ./template.json dest` usage).
+    const looksLikePath =
+      item.endsWith('.json') || item.includes('/') || item.includes(path.sep);
+    if (looksLikePath || (!config.templates[item] && fs.existsSync(item))) {
       try {
         const resolvedPath = path.resolve(item);
         const fileContent = fs.readFileSync(resolvedPath, 'utf-8');

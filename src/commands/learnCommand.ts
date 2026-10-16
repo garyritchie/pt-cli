@@ -14,6 +14,7 @@ import {
   parsePostConfigScript,
   mergePostConfigTasks,
   mergePostCopyFiles,
+  mergeFolderStructures,
   buildCopyFiles,
   promptTemplateName,
   promptDescription,
@@ -267,18 +268,26 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   let folders: FolderNode[];
 
   if (isUpdate) {
-    // Additive mode for updates
+    // Additive mode for updates (recursive: refreshes folder info + nested subfolders)
     const existingTemplate = config.templates[updateTemplate];
-    
-    // New folders
-    const newFolders = detectedFolders.filter((f: FolderNode) => !existingTemplate.folders?.some((ef: FolderNode) => ef.name === f.name));
+
+    const merge = mergeFolderStructures(existingTemplate.folders || [], detectedFolders);
+    const newFolders = merge.newTopLevel;
+    if (merge.updatedInfoCount > 0 && !options.json) {
+      console.log(chalk.cyan(`\n📝 Updated folder info:`));
+      console.log(chalk.green(`  ~ ${merge.updatedInfoCount} folder(s): ${merge.updatedInfoPaths.join(', ')}`));
+    }
+    if (merge.newNestedCount > 0 && !options.json) {
+      console.log(chalk.cyan(`\n📂 New subfolders:`));
+      console.log(chalk.green(`  + ${merge.newNestedCount} subfolder(s): ${merge.newNestedPaths.join(', ')}`));
+    }
     if (newFolders.length > 0) {
       const addedFolders = await promptNewFolders(newFolders, options);
-      // Create new folders array preserving existing
-      folders = [...existingTemplate.folders, ...addedFolders];
+      // Create new folders array preserving existing (with refreshed info + nested additions)
+      folders = [...merge.merged, ...addedFolders];
     } else {
-      printNoNewFolders();
-      folders = existingTemplate.folders;
+      if (merge.updatedInfoCount === 0 && merge.newNestedCount === 0) printNoNewFolders();
+      folders = merge.merged;
     }
 
     // selectedStructure should include ALL folders (existing + added) in additive mode

@@ -276,6 +276,93 @@ export function buildCopyFiles(
 }
 
 /**
+ * Result of recursively merging detected folder structure into existing template folders.
+ */
+export interface FolderMergeResult {
+  /** Existing folders with refreshed info + auto-added nested subfolders (new top-level NOT included). */
+  merged: FolderNode[];
+  /** Detected top-level folders absent from existing (candidates for prompt). */
+  newTopLevel: FolderNode[];
+  /** Count of nested subfolders auto-added under existing parents. */
+  newNestedCount: number;
+  /** Paths (e.g. "BRANDING_KIT/LOGOS") of nested subfolders auto-added. */
+  newNestedPaths: string[];
+  /** Count of existing folders whose info was refreshed from disk. */
+  updatedInfoCount: number;
+  /** Paths of folders whose info was refreshed. */
+  updatedInfoPaths: string[];
+}
+
+/**
+ * Recursively merge detected structure into existing template folders.
+ *
+ * Fixes Issue #8: the old additive update only diffed top-level folder names,
+ * so `.info.md` files added to existing folders (e.g. GLO/IDY/BRANDING_KIT/**)
+ * and new nested subfolders were silently dropped.
+ *
+ * - Top-level matches are merged in place; genuinely new top-level folders are
+ *   returned in `newTopLevel` for the usual prompt flow.
+ * - Nested subfolders under an existing parent are auto-added (the user already
+ *   accepted the parent; there was previously no prompt for them at all).
+ * - `info` on an existing folder is refreshed when the detected value is
+ *   non-empty and differs. Empty detected info never wipes existing info, so
+ *   GUI/manual edits are preserved when no `.info.md`/`.gitkeep.md` exists.
+ */
+export function mergeFolderStructures(
+  existing: FolderNode[],
+  detected: FolderNode[]
+): FolderMergeResult {
+  const merged: FolderNode[] = JSON.parse(JSON.stringify(existing));
+  const newTopLevel: FolderNode[] = [];
+  const newNestedPaths: string[] = [];
+  const updatedInfoPaths: string[] = [];
+
+  const refreshInfo = (existingNode: FolderNode, detectedNode: FolderNode, nodePath: string): void => {
+    const detectedInfo = (detectedNode.info || '').trim();
+    const existingInfo = (existingNode.info || '').trim();
+    if (detectedInfo && detectedInfo !== existingInfo) {
+      existingNode.info = detectedNode.info;
+      updatedInfoPaths.push(nodePath);
+    }
+  };
+
+  const mergeChildren = (existingNode: FolderNode, detectedNode: FolderNode, parentPath: string): void => {
+    if (!existingNode.children) existingNode.children = [];
+    const detectedChildren = detectedNode.children || [];
+    for (const detectedChild of detectedChildren) {
+      const childPath = parentPath ? `${parentPath}/${detectedChild.name}` : detectedChild.name;
+      const match = existingNode.children.find(c => c.name === detectedChild.name);
+      if (!match) {
+        existingNode.children.push(JSON.parse(JSON.stringify(detectedChild)));
+        newNestedPaths.push(childPath);
+      } else {
+        refreshInfo(match, detectedChild, childPath);
+        mergeChildren(match, detectedChild, childPath);
+      }
+    }
+  };
+
+  for (const detectedFolder of detected) {
+    const match = merged.find(f => f.name === detectedFolder.name);
+    if (!match) {
+      newTopLevel.push(detectedFolder);
+    } else {
+      refreshInfo(match, detectedFolder, detectedFolder.name);
+      mergeChildren(match, detectedFolder, detectedFolder.name);
+    }
+  }
+
+  return {
+    merged,
+    newTopLevel,
+    newNestedCount: newNestedPaths.length,
+    newNestedPaths,
+    updatedInfoCount: updatedInfoPaths.length,
+    updatedInfoPaths
+  };
+}
+
+/**
  * Prompt for template name with overwrite warning
  */
 export async function promptTemplateName(

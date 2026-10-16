@@ -14,6 +14,7 @@ import {
   parsePostConfigScript,
   mergePostConfigTasks,
   mergePostCopyFiles,
+  mergeFolderStructures,
   buildCopyFiles,
   promptTemplateName,
   promptDescription,
@@ -229,24 +230,34 @@ export async function update(sourcePath: string, templateName: string, options: 
     let selectedFolders: string[] = [];
   
     if (!isFullMode) {
-      // Additive mode: only add new folders
+      // Additive mode: add new folders, refresh folder info, pick up nested subfolders
       const detectedFolders = fileTemplateConfig.folders && Array.isArray(fileTemplateConfig.folders)
         ? fileTemplateConfig.folders
         : extractStructure(resolvedPath, resolvedPath, ignorePatterns);
 
       const existingFolders = config.templates[templateName].folders || [];
-      const newFolders = detectedFolders.filter(f => !existingFolders.some(ef => ef.name === f.name));
+      const merge = mergeFolderStructures(existingFolders, detectedFolders);
+      const newFolders = merge.newTopLevel;
 
+      if (merge.updatedInfoCount > 0) {
+        console.log(chalk.cyan(`\n📝 Updated folder info:`));
+        console.log(chalk.green(`  ~ ${merge.updatedInfoCount} folder(s): ${merge.updatedInfoPaths.join(', ')}`));
+      }
+      if (merge.newNestedCount > 0) {
+        console.log(chalk.cyan(`\n📂 New subfolders:`));
+        console.log(chalk.green(`  + ${merge.newNestedCount} subfolder(s): ${merge.newNestedPaths.join(', ')}`));
+      }
+
+      let addedFolders: FolderNode[] = [];
       if (newFolders.length > 0) {
         console.log(chalk.cyan(`\n📊 New Folders:`));
         console.log(chalk.green(`  + ${newFolders.length} new folder(s): ${newFolders.map(f => f.name).join(', ')}`));
 
-        const addedFolders = await promptNewFolders(newFolders, options);
-        folders = [...existingFolders, ...addedFolders];
-      } else {
+        addedFolders = await promptNewFolders(newFolders, options);
+      } else if (merge.updatedInfoCount === 0 && merge.newNestedCount === 0) {
         printNoNewFolders();
-        folders = existingFolders;
       }
+      folders = [...merge.merged, ...addedFolders];
 
       // selectedStructure should include ALL folders (existing + added) in additive mode
       // so that the final filter doesn't drop user-selected new folders

@@ -468,4 +468,81 @@ test('update: JSON mode outputs template config', async () => {
   }
 });
 
+test('update: picks up new .info.md and nested subfolders in existing folders (Issue #8)', async () => {
+  const srcDir = createSourceDir('.test-update-folder-info');
+  cleanup(testHome);
+
+  try {
+    const initialConfig: PtConfig = {
+      version: '3.0',
+      templates: {
+        'update-test-info': {
+          description: 'Test',
+          templateRoot: '/old/path',
+          folders: [{ name: 'BRANDING_KIT', info: '', children: [{ name: 'LOGOS', info: '', children: [] }] }],
+          copy_files: [],
+          variables: []
+        }
+      }
+    };
+    saveConfig(initialConfig);
+
+    fs.mkdirSync(path.join(srcDir, 'BRANDING_KIT', 'LOGOS'), { recursive: true });
+    fs.mkdirSync(path.join(srcDir, 'BRANDING_KIT', 'COLORS'), { recursive: true });
+    fs.writeFileSync(path.join(srcDir, 'BRANDING_KIT', '.info.md'), 'Brand assets root');
+    fs.writeFileSync(path.join(srcDir, 'BRANDING_KIT', 'LOGOS', '.info.md'), 'Logo files');
+    fs.writeFileSync(path.join(srcDir, 'BRANDING_KIT', 'COLORS', '.info.md'), 'Color palettes');
+
+    await update(srcDir, 'update-test-info', { yes: true });
+
+    const config = loadConfig();
+    const tpl = config.templates['update-test-info'];
+
+    const branding = tpl.folders.find(f => f.name === 'BRANDING_KIT');
+    assert.ok(branding, 'Should preserve BRANDING_KIT');
+    assert.strictEqual(branding.info, 'Brand assets root', 'Should refresh parent folder info');
+
+    const logos = branding.children?.find(c => c.name === 'LOGOS');
+    assert.ok(logos, 'Should preserve LOGOS');
+    assert.strictEqual(logos.info, 'Logo files', 'Should refresh nested folder info');
+
+    const colors = branding.children?.find(c => c.name === 'COLORS');
+    assert.ok(colors, 'Should add new nested subfolder COLORS');
+    assert.strictEqual(colors.info, 'Color palettes', 'New nested subfolder should carry its info');
+  } finally {
+    cleanup(srcDir, testHome);
+  }
+});
+
+test('update: preserves existing folder info when disk has no .info.md', async () => {
+  const srcDir = createSourceDir('.test-update-folder-info-keep');
+  cleanup(testHome);
+
+  try {
+    const initialConfig: PtConfig = {
+      version: '3.0',
+      templates: {
+        'update-test-info-keep': {
+          description: 'Test',
+          templateRoot: '/old/path',
+          folders: [{ name: 'KEEP', info: 'GUI edited info', children: [] }],
+          copy_files: [],
+          variables: []
+        }
+      }
+    };
+    saveConfig(initialConfig);
+
+    fs.mkdirSync(path.join(srcDir, 'KEEP'), { recursive: true });
+
+    await update(srcDir, 'update-test-info-keep', { yes: true });
+
+    const config = loadConfig();
+    const tpl = config.templates['update-test-info-keep'];
+    assert.strictEqual(tpl.folders[0].info, 'GUI edited info', 'Should not wipe existing info when disk has none');
+  } finally {
+    cleanup(srcDir, testHome);
+  }
+});
+
 cleanup(testHome);

@@ -347,7 +347,8 @@ export async function learn(sourcePath: string, updateTemplate: string | null = 
   // --- POST_CONFIG ---
   const shPath = path.join(resolvedPath, 'post_config.sh');
   const batPath = path.join(resolvedPath, 'post_config.bat');
-  const detectedTasks = parsePostConfigScript(shPath, batPath);
+  const ps1Path = path.join(resolvedPath, 'post_config.ps1');
+  const detectedTasks = parsePostConfigScript(shPath, batPath, ps1Path);
 
   let postConfigTasks: PostConfigTask[] = isUpdate ? config.templates[updateTemplate].post_config || [] : [];
   postConfigTasks = mergePostConfigTasks(postConfigTasks, fileTemplateConfig.post_config, detectedTasks);

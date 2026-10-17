@@ -361,7 +361,8 @@ export async function update(sourcePath: string, templateName: string, options: 
   // Check for post_config scripts
   const shPath = path.join(resolvedPath, 'post_config.sh');
   const batPath = path.join(resolvedPath, 'post_config.bat');
-  const detectedTasks = parsePostConfigScript(shPath, batPath);
+  const ps1Path = path.join(resolvedPath, 'post_config.ps1');
+  const detectedTasks = parsePostConfigScript(shPath, batPath, ps1Path);
 
   let postConfigTasks: PostConfigTask[] = config.templates[templateName].post_config || [];
   postConfigTasks = mergePostConfigTasks(postConfigTasks, fileTemplateConfig.post_config, detectedTasks);

@@ -163,9 +163,9 @@ export function detectRootExecutables(dirPath: string, ignorePatterns?: string[]
 }
 
 /**
- * Parse post_config.sh or post_config.bat for commands
+ * Parse post_config.sh, post_config.bat, or post_config.ps1 for commands
  */
-export function parsePostConfigScript(shPath: string, batPath: string): PostConfigTask[] {
+export function parsePostConfigScript(shPath: string, batPath: string, ps1Path?: string): PostConfigTask[] {
   const tasks: PostConfigTask[] = [];
   
   if (fs.existsSync(shPath)) {
@@ -175,22 +175,54 @@ export function parsePostConfigScript(shPath: string, batPath: string): PostConf
       if (line.startsWith('echo "Running: ')) {
         currentDesc = line.substring(15, line.length - 1).replace(/"$/, '');
       } else if (line.trim() && !line.startsWith('#') && !line.startsWith('echo ')) {
-        tasks.push({ command: line.trim(), description: currentDesc || line.trim() });
+        tasks.push({
+          command: line.trim(),
+          description: currentDesc || line.trim(),
+          shell: 'bash',
+          platform: 'posix'
+        });
         currentDesc = '';
       }
     }
-  } else if (fs.existsSync(batPath)) {
+  }
+
+  if (ps1Path && fs.existsSync(ps1Path)) {
+    const lines = fs.readFileSync(ps1Path, 'utf-8').split('\n');
+    let currentDesc = '';
+    for (const line of lines) {
+      if (line.startsWith('Write-Host "Running: ') || line.startsWith('# Running: ')) {
+        const prefixLen = line.startsWith('Write-Host "Running: ') ? 21 : 11;
+        currentDesc = line.substring(prefixLen).replace(/["\r\n]+$/, '').trim();
+      } else if (line.trim() && !line.startsWith('#') && !line.startsWith('Write-Host') && !line.startsWith('$ErrorActionPreference')) {
+        tasks.push({
+          command: line.trim(),
+          description: currentDesc || line.trim(),
+          shell: 'powershell',
+          platform: 'windows'
+        });
+        currentDesc = '';
+      }
+    }
+  }
+
+  if (fs.existsSync(batPath)) {
     const lines = fs.readFileSync(batPath, 'utf-8').split('\n');
     let currentDesc = '';
     for (const line of lines) {
       if (line.startsWith('echo Running: ')) {
         currentDesc = line.substring(14).trim();
       } else if (line.trim() && !line.startsWith('::') && !line.startsWith('@echo') && !line.startsWith('echo ')) {
-        tasks.push({ command: line.trim(), description: currentDesc || line.trim() });
+        tasks.push({
+          command: line.trim(),
+          description: currentDesc || line.trim(),
+          shell: 'cmd',
+          platform: 'windows'
+        });
         currentDesc = '';
       }
     }
   }
+
   return tasks;
 }
 

@@ -36,6 +36,13 @@ As an agent equipped with this skill, you have the ability to rapidly scaffold, 
    - Post-config security validation checks substituted commands, properly catching dangerous or blocked commands resolved from variables
    - **Hyphenated variable name support**: `substituteVariables` now supports variable names containing hyphens (`[a-zA-Z0-9_-]+`)
 
+   ### New in 1.7+: Multi-Platform Shell Support & Detection
+   - **Automatic Host Detection:** `pt init` detects the host OS (`windows`, `linux`, `darwin`) and active terminal shell (`powershell`, `bash`, `cmd`).
+   - **Guaranteed Scaffolding:** Templates created on Linux containing bash-specific commands (e.g. `chmod`, `export`, `source`) will not fail `pt init` on Windows. Incompatible tasks print warnings while folder structures, copied files, and `.info.md` are always created.
+   - **Shell Flags:** Force a specific interpreter or platform context if necessary: `pt init <template> <dest> --yes --shell powershell` or `--platform windows`.
+   - **Multi-Shell Authoring:** Templates can define tasks targeted with `platform: "windows"|"posix"|"all"` and `shell: "powershell"|"bash"|"cmd"`, or use polymorphic command maps: `command: { windows: "...", posix: "..." }`.
+   - **Artifacts:** `post_config.ps1`, `post_config.sh`, and `post_config.bat` are automatically written to the destination project root.
+
 3. **Capturing Knowledge (`pt learn`):****
    If you spend time establishing a new, complex directory structure or configuration (e.g., a specific flavor of an Express backend with testing hooks), save it! Remote URLs (GitHub, Gitea, etc.) are automatically translated to tarball downloads.
    - **Command:** `pt learn <source_path> --name <template_name> --desc "<Description>" --yes`

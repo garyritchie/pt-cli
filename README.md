@@ -96,6 +96,7 @@ Prefer a graphical interface? An [official GUI](https://garylritchie.gumroad.com
 - **Multi-Template Initialization**: Initialize from multiple templates at once (`pt init base addon my-project`), combining folders, files, variables, and post-config with collision detection and README auto-renaming.
 - **Task Deduplication**: Post-config tasks with identical command+description are deduplicated across templates, executing each unique task only once with a single security prompt.
 - **Post-Config Variable Support**: `pt init` now substitutes template variables into `post_config` commands, scripts, and descriptions; variable pre-filling from `.env` files and `--vars` CLI flags even when templates don't define a `variables` block; hyphenated variable name support (`[a-zA-Z0-9_-]+`).
+- **Multi-Platform Shell Detection**: Run templates containing mixed Linux Bash, Windows PowerShell, and CMD tasks seamlessly. Automatically detects host OS and active terminal shell context, with `--shell` and `--platform` overrides. Scaffolding is guaranteed: foreign or untagged bash tasks on Windows print warnings without failing initialization. Generates shell-specific artifact scripts (`post_config.ps1`, `post_config.sh`, `post_config.bat`).
 
 ## Quick Start
 
@@ -225,7 +226,7 @@ Because `pt-cli` is built around flexibility, the app purposefully avoids imposi
 **CLI Commands & Flags:**
 ```bash
 pt learn [path] [--ignore] [--name] [--desc] [--yes] [--json] [--allow-untrusted] [--no-diff]
-pt init [template] [dest] [--file] [--skip-post-config] [--dry-run] [--yes] [--vars]
+pt init [template] [dest] [--file] [--skip-post-config] [--dry-run] [--yes] [--vars] [--shell] [--platform] [--strict-post-config]
 pt update <template> [path] [--ignore] [--desc] [--yes] [--no-diff]
 pt config [template] [--json]
 pt add <name> [--file] [json]
@@ -269,7 +270,7 @@ post_config?: PostConfigTask[]
   "variables": [{ "name": "", "prompt": "", "default": "", "required": false }],
   "folders": [{ "name": "", "info": "", "children": [] }],
   "copy_files": [{ "src": "", "dest": "", "substitute_variables": false, "chmod": "" }],
-  "post_config": [{ "command": "", "description": "", "type": "", "always_prompt": false, "script": "", "cross_platform": false, "checked": true }],
+  "post_config": [{ "command": "", "description": "", "type": "", "platform": "all", "shell": "auto", "always_prompt": false, "script": "", "cross_platform": false, "checked": true }],
   "post_copy": [{ "src": "", "dest": "" }]
 }
 ```

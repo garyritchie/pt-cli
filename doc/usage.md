@@ -138,7 +138,24 @@ pt init <template_name> [template_name2...] /path/to/new/PROJECT --yes --vars pr
 
 # Initialize directly from a JSON template file (no config.yaml registration)
 pt init /path/to/new/PROJECT --file my-template.json --yes
+
+# Specify shell interpreter (powershell, bash, cmd)
+pt init my-template /path/to/new/PROJECT --shell powershell
+
+# Specify target platform context (windows, linux, darwin, posix)
+pt init my-template /path/to/new/PROJECT --platform windows
+
+# Fail initialization if any post-config task exits with a non-zero code (useful in CI)
+pt init my-template /path/to/new/PROJECT --strict-post-config --yes
 ```
+
+### Multi-Platform Compatibility & Shell Detection
+
+Templates can include commands intended for different operating systems (Windows PowerShell, Linux/macOS Bash, Windows CMD).
+
+- **Automatic Shell Detection**: `pt` automatically identifies whether it is running on Windows (PowerShell or Git Bash) or POSIX (Bash/Zsh).
+- **Graceful Fallbacks**: If a template authored on Linux with bash commands (e.g. `chmod`, `export`, `source`) is initialized on Windows, `pt` detects the incompatibility, logs an informative warning, and cleanly skips the command. **The project directories, copied files, and `.info.md` are always created.**
+- **Artifact Script Generation**: Every initialization generates shell-appropriate scripts (`post_config.ps1`, `post_config.sh`, and `post_config.bat`) in the project root so developers can re-run tasks in their preferred shell environment.
 
 ### Multi-Template Initialization
 

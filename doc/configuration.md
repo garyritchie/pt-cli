@@ -165,14 +165,41 @@ templates:
 
 Each task supports:
 
-| Field            | Description                                                                      |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `command`        | Shell command to run (auto-selected shell: `cmd /c` on Windows, `sh -c` on Unix) |
-| `description`    | Shown to user during prompt                                                      |
-| `type`           | Filter by project type (e.g., `javascript`)                                      |
-| `always_prompt`  | If `true`, ask per-task even if user says "yes"                                  |
-| `script`         | Path to script relative to template root                                         |
-| `cross_platform` | If `true`, use platform-safe runner                                              |
+| Field            | Description                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------- |
+| `command`        | Shell command to run (string or polymorphic map e.g. `{ windows: "...", posix: "..." }`)             |
+| `description`    | Shown to user during prompt                                                                          |
+| `platform`       | Target operating system: `windows`, `posix`, `linux`, `darwin`, or `all` (default)                   |
+| `shell`          | Target shell interpreter: `powershell` (or `pwsh`), `bash` (or `sh`), `cmd`, or `auto` (default)    |
+| `type`           | Filter by project type (e.g., `javascript`)                                                          |
+| `always_prompt`  | If `true`, ask per-task even if user says "yes"                                                      |
+| `script`         | Path to script relative to template root                                                             |
+| `cross_platform` | If `true`, use platform-safe runner                                                                  |
+
+**Multi-Platform Command Definition**:
+
+```yaml
+templates:
+  multiplatform_app:
+    description: Multi-Platform App Template
+    post_config:
+      - description: "Initialize git repository"
+        command: "git init"
+        platform: "all"
+      - description: "Setup virtual environment (Windows)"
+        command: "python -m venv .venv; .\\.venv\\Scripts\\Activate.ps1"
+        platform: "windows"
+        shell: "powershell"
+      - description: "Setup virtual environment (POSIX)"
+        command: "python3 -m venv .venv && source .venv/bin/activate"
+        platform: "posix"
+        shell: "bash"
+      # Or via polymorphic command map:
+      - description: "Install dependencies"
+        command:
+          windows: "npm.cmd install"
+          posix: "npm install"
+```
 
 **Interaction flow** during `pt init` (single or multiple templates):
 

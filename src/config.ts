@@ -34,14 +34,19 @@ export interface FolderNode {
   is_file?: boolean;
 }
 
+export type SupportedPlatform = 'windows' | 'linux' | 'darwin' | 'posix' | 'all';
+export type SupportedShell = 'powershell' | 'pwsh' | 'bash' | 'sh' | 'cmd' | 'auto';
+
 export interface PostConfigTask {
-  command?: string;       // shell command to run
+  command?: string | { [key in SupportedPlatform | SupportedShell]?: string }; // shell command to run
   description: string;   // shown to user
   type?: string;          // only run for matching project type (optional)
   always_prompt?: boolean; // if true, ask per-task even if user says "yes"
   script?: string;        // path to script relative to template root
   cross_platform?: boolean; // if true, use platform-safe runner
   checked?: boolean;      // default checkbox state (only for global tasks)
+  platform?: SupportedPlatform | SupportedPlatform[];
+  shell?: SupportedShell | SupportedShell[];
 }
 
 export interface CopyFileEntry {

@@ -93,6 +93,9 @@ program
   .option('-y, --yes', 'Automatically answer yes to prompts')
   .option('--vars <variables>', 'Comma-separated key=value variables (e.g. key1=val1,key2=val2)')
   .option('--collision <mode>', 'File collision resolution strategy (overwrite, newest)', 'overwrite')
+  .option('--shell <type>', 'Specify execution shell context (powershell, bash, cmd)')
+  .option('--platform <type>', 'Specify execution platform context (windows, linux, darwin, posix)')
+  .option('--strict-post-config', 'Fail initialization if any post-config task fails')
   .option('--json', 'Output result as JSON')
   .action(async (args: string[], options) => {
     try {

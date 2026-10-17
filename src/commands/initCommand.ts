@@ -4,7 +4,15 @@ import inquirer from 'inquirer';
 import { loadConfig, FolderNode, sanitizePath, TemplateConfig, TemplateVariable, PostConfigTask, PtConfig } from '../config.js';
 import chalk from 'chalk';
 import { processCopyFiles, substituteVariables } from '../substitute.js';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
+import {
+  resolveExecutionContext,
+  matchesPlatform,
+  matchesShell,
+  classifyCommandCompatibility,
+  resolveTaskCommand,
+  ExecutionContext
+} from '../shell.js';
 
 export interface InitOptions {
   skipPostConfig?: boolean;
@@ -14,6 +22,9 @@ export interface InitOptions {
   file?: string;
   collision?: 'overwrite' | 'newest';
   json?: boolean;
+  shell?: string;
+  platform?: string;
+  strictPostConfig?: boolean;
 }
 
 interface LoadedTemplate {
@@ -560,14 +571,39 @@ export async function init(
     console.log(chalk.gray(`  [DRY RUN] Would create .info.md`));
   }
 
-  // 6. Collect and deduplicate post_config tasks from all templates
-  // Key: command|description -> { task, templates: string[], _id: string }
-  const taskMap = new Map<string, PostConfigTask & { templates: string[]; _id: string }>();
+  // 6. Collect, filter, and deduplicate post_config tasks from all templates
+  const execContext = resolveExecutionContext({
+    shell: options.shell,
+    platform: options.platform
+  });
+
+  // Key: command|description -> { task, templates: string[], _id: string, resolvedCmd?: string }
+  const taskMap = new Map<string, PostConfigTask & { templates: string[]; _id: string; resolvedCmd?: string }>();
   let taskIdCounter = 0;
   
   for (const lt of loadedTemplates) {
     if (lt.template.post_config) {
-      for (const t of lt.template.post_config) {
+      for (const rawTask of lt.template.post_config) {
+        // Clone so we don't mutate the loaded config
+        const t = { ...rawTask };
+
+        // 6a. Check platform & shell compatibility
+        if (!matchesPlatform(t.platform, execContext.os)) {
+          continue;
+        }
+        if (!matchesShell(t.shell, execContext.shell)) {
+          continue;
+        }
+
+        // 6b. Resolve concrete command string (string or polymorphic map)
+        const resolvedCommand = resolveTaskCommand(t, execContext);
+        if (t.command && !resolvedCommand) {
+          // Task had a polymorphic command map but no branch for current os/shell
+          continue;
+        }
+        t.command = resolvedCommand;
+
+        // 6c. Variable substitution
         if (Object.keys(variables).length > 0) {
           if (t.command) {
             t.command = substituteVariables(t.command, variables);
@@ -579,7 +615,22 @@ export async function init(
             t.script = substituteVariables(t.script, variables);
           }
         }
+
+        // 6d. Filter by project type
         if (!t.type || t.type === lt.name) {
+          // Heuristic check: untagged command incompatible with active shell
+          if (t.command && !t.platform && !t.shell) {
+            const compat = classifyCommandCompatibility(t.command, execContext);
+            if (!compat.compatible) {
+              if (!options.json) {
+                console.warn(chalk.yellow(`\n⚠️  Skipping incompatible task on ${execContext.os} (${execContext.shell}):`));
+                console.warn(chalk.yellow(`   Command: ${t.command}`));
+                console.warn(chalk.yellow(`   Reason: ${compat.reason}`));
+              }
+              continue;
+            }
+          }
+
           const key = `${t.command || t.script || ''}|${t.description || ''}`;
           if (taskMap.has(key)) {
             taskMap.get(key)!.templates.push(lt.name);
@@ -587,7 +638,8 @@ export async function init(
             taskMap.set(key, { 
               ...t, 
               templates: [lt.name], 
-              _id: `task_${taskIdCounter++}` 
+              _id: `task_${taskIdCounter++}`,
+              resolvedCmd: t.command
             });
           }
         }
@@ -598,25 +650,29 @@ export async function init(
   const allTasks = Array.from(taskMap.values());
 
   if (allTasks.length > 0 && !options.skipPostConfig) {
-    // SECURITY CHECK: Validate template safety (aggregate across all templates)
-    const { validateTemplateSecurity } = await import('../safety.js');
+    // SECURITY CHECK: Validate template safety on filtered, applicable tasks only
+    const { isBlockedCommand, isDangerousCommand } = await import('../safety.js');
     
-    // Collect all errors and warnings from all templates first
     const allErrors: Array<{ template: string; error: string }> = [];
     const allWarnings: Array<{ template: string; warning: string }> = [];
     
-    for (const lt of loadedTemplates) {
-      const { valid, errors, warnings } = validateTemplateSecurity(lt.template);
-      
-      for (const err of errors) {
-        allErrors.push({ template: lt.name, error: err });
+    for (const t of allTasks) {
+      const raw = t.command || (t.script ? `./${t.script}` : '');
+      const cmd = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      if (!cmd) continue;
+
+      if (isBlockedCommand(cmd)) {
+        allErrors.push({ template: t.templates.join(', '), error: `Blocked command in task: ${cmd}` });
       }
-      for (const warn of warnings) {
-        allWarnings.push({ template: lt.name, warning: warn });
+      if (isDangerousCommand(cmd)) {
+        allWarnings.push({ template: t.templates.join(', '), warning: `Dangerous command in task: ${cmd}` });
+      }
+      if (cmd.includes(';') || cmd.includes('|') || cmd.includes('&')) {
+        allWarnings.push({ template: t.templates.join(', '), warning: `Shell chaining / piping in command: ${cmd}` });
       }
     }
     
-    // Handle errors - any blocked command aborts everything
+    // Handle errors - any blocked command aborts post_config execution
     if (allErrors.length > 0) {
       if (!options.json) {
         console.error(chalk.red(`\n❌ SECURITY ERROR: Aborting post_config execution due to blocked commands:`));
@@ -624,11 +680,13 @@ export async function init(
           console.error(chalk.red(`   [${template}] ${error}`));
         }
       }
-      process.exit(1);
+      if (options.strictPostConfig) {
+        process.exit(1);
+      }
     }
     
     // Handle warnings - single aggregated prompt for all templates
-    if (allWarnings.length > 0) {
+    if (allWarnings.length > 0 && allErrors.length === 0) {
       if (!options.json) {
         console.warn(chalk.yellow(`\n⚠️  SECURITY WARNING: Post-config tasks contain dangerous commands:`));
         for (const { template, warning } of allWarnings) {
@@ -640,12 +698,12 @@ export async function init(
         const { proceed } = await inquirer.prompt({
           type: 'confirm',
           name: 'proceed',
-          message: chalk.red(`Security warnings found in ${new Set(allWarnings.map(w => w.template)).size} template(s). Run post-config tasks anyway?`),
+          message: chalk.red(`Security warnings found. Run post-config tasks anyway?`),
           default: false
         });
         if (!proceed) {
           if (!options.json) console.log(chalk.yellow("Post-config tasks aborted by user."));
-          return;
+          allTasks.length = 0;
         }
       } else if (!options.json) {
         console.warn(chalk.yellow("Proceeding anyway (non-interactive mode with auto-confirm enabled)."));
@@ -654,78 +712,127 @@ export async function init(
 
     let selectedTaskIds: string[] = [];
 
-    if (options.dryRun) {
-      selectedTaskIds = allTasks.map(t => t._id);
-      if (!options.json) {
-        console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks:`));
+    if (allTasks.length > 0) {
+      if (options.dryRun) {
+        selectedTaskIds = allTasks.map(t => t._id);
+        if (!options.json) {
+          console.log(chalk.yellow(`\n[DRY RUN] Applicable post-config tasks (${execContext.os}/${execContext.shell}):`));
+          for (const t of allTasks) {
+            const desc = t.description ? ` (${t.description})` : '';
+            const templatesNote = t.templates.length > 1 ? ` [${t.templates.join(', ')}]` : ` [${t.templates[0]}]`;
+            console.log(chalk.gray(`  ${t.command || `./${t.script}`}${desc}${templatesNote}`));
+          }
+        }
+      } else if (options.yes) {
+        selectedTaskIds = allTasks.map(t => t._id);
+      } else {
+        const choices: Array<{name: string; value: string; checked?: boolean}> = [];
+
         for (const t of allTasks) {
+          const cmd = t.command || `./${t.script}` || '(no command)';
           const desc = t.description ? ` (${t.description})` : '';
           const templatesNote = t.templates.length > 1 ? ` [${t.templates.join(', ')}]` : ` [${t.templates[0]}]`;
-          console.log(chalk.gray(`  ${t.command || `./${t.script}`}${desc}${templatesNote}`));
+          choices.push({
+            name: `${cmd}${desc}${templatesNote}`,
+            value: t._id,
+            checked: true
+          });
         }
-      }
-    } else if (options.yes) {
-      selectedTaskIds = allTasks.map(t => t._id);
-    } else {
-      const choices: Array<{name: string; value: string; checked?: boolean}> = [];
 
-      for (const t of allTasks) {
-        const cmd = t.command || `./${t.script}` || '(no command)';
-        const desc = t.description ? ` (${t.description})` : '';
-        const templatesNote = t.templates.length > 1 ? ` [${t.templates.join(', ')}]` : ` [${t.templates[0]}]`;
-        choices.push({
-          name: `${cmd}${desc}${templatesNote}`,
-          value: t._id,
-          checked: true
+        const response = await inquirer.prompt({
+          type: 'checkbox',
+          name: 'selected',
+          message: `Select post-config tasks to run (${execContext.os}/${execContext.shell}):`,
+          loop: false,
+          theme: {
+            icon: {
+              checked: chalk.green('[x] '),
+              unchecked: '[ ] ',
+            }
+          },
+          choices
         });
+        selectedTaskIds = response.selected || [];
       }
-
-      const response = await inquirer.prompt({
-        type: 'checkbox',
-        name: 'selected',
-        message: 'Select post-config tasks to run:',
-        loop: false,
-        theme: {
-          icon: {
-            checked: chalk.green('[x] '),
-            unchecked: '[ ] ',
-          }
-        },
-        choices
-      });
-      selectedTaskIds = response.selected || [];
     }
 
-    if (selectedTaskIds.length > 0 && !options.dryRun) {
+    if (selectedTaskIds.length > 0 && !options.dryRun && allErrors.length === 0) {
+      // Generate multi-shell scripts for inspected reference & execution
       let bashContent = '#!/bin/bash\n# Auto-generated post_config script\n\n';
       let batContent = '@echo off\n:: Auto-generated post_config script\n\n';
+      let ps1Content = '# Auto-generated post_config script\n$ErrorActionPreference = "Stop"\n\n';
+
       for (const t of allTasks) {
-        let cmd = '';
-        if (t.command) {
-          cmd = t.command;
-        } else if (t.script) {
-          cmd = `./${t.script}`;
-        }
-        if (selectedTaskIds.includes(t._id)) {
-          if (cmd) {
-            bashContent += `echo "Running: ${t.description || cmd}"\n${cmd}\n`;
-            batContent += `echo Running: ${t.description || cmd}\n${cmd}\n`;
-          }
+        const raw = t.command || (t.script ? `./${t.script}` : '');
+        const cmd = typeof raw === 'string' ? raw : (raw ? JSON.stringify(raw) : '');
+        if (selectedTaskIds.includes(t._id) && cmd) {
+          bashContent += `echo "Running: ${t.description || cmd}"\n${cmd}\n`;
+          batContent += `echo Running: ${t.description || cmd}\n${cmd}\n`;
+          ps1Content += `Write-Host "Running: ${t.description || cmd}"\n${cmd}\n`;
         }
       }
+
       fs.writeFileSync(path.join(resolvedDest, 'post_config.sh'), bashContent);
       try { fs.chmodSync(path.join(resolvedDest, 'post_config.sh'), 0o755); } catch(e) {}
       fs.writeFileSync(path.join(resolvedDest, 'post_config.bat'), batContent);
+      fs.writeFileSync(path.join(resolvedDest, 'post_config.ps1'), ps1Content);
 
-      if (!options.json) console.log(chalk.cyan("\nExecuting post-config tasks..."));
-      try {
-        const scriptCmd = process.platform === 'win32' ? 'post_config.bat' : './post_config.sh';
-        execSync(scriptCmd, {
-          cwd: resolvedDest,
-          stdio: options.json ? 'ignore' : 'inherit'
-        });
-      } catch (e) {
-        if (!options.json) console.error(chalk.red("\nError: Some post-config tasks failed. Check the output above."));
+      if (!options.json) console.log(chalk.cyan(`\nExecuting post-config tasks using ${execContext.shell}...`));
+      
+      let hasFailures = false;
+      for (const t of allTasks) {
+        if (!selectedTaskIds.includes(t._id)) continue;
+        const raw = t.command || (t.script ? `./${t.script}` : '');
+        const cmd = typeof raw === 'string' ? raw : (raw ? JSON.stringify(raw) : '');
+        if (!cmd) continue;
+
+        if (!options.json) {
+          console.log(chalk.yellow(`  Running: ${t.description || cmd}`));
+        }
+
+        try {
+          if (execContext.shell === 'powershell') {
+            // Run via powershell.exe / pwsh
+            const psExe = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
+            const proc = spawnSync(psExe, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', cmd], {
+              cwd: resolvedDest,
+              stdio: options.json ? 'ignore' : 'inherit',
+              encoding: 'utf-8'
+            });
+            if (proc.status !== 0) {
+              hasFailures = true;
+              if (!options.json) console.warn(chalk.yellow(`  ⚠️  Task failed with exit code ${proc.status}: ${cmd}`));
+            }
+          } else if (execContext.shell === 'bash') {
+            const proc = spawnSync('bash', ['-c', cmd], {
+              cwd: resolvedDest,
+              stdio: options.json ? 'ignore' : 'inherit',
+              encoding: 'utf-8'
+            });
+            if (proc.status !== 0) {
+              hasFailures = true;
+              if (!options.json) console.warn(chalk.yellow(`  ⚠️  Task failed with exit code ${proc.status}: ${cmd}`));
+            }
+          } else {
+            // CMD / default
+            execSync(cmd, {
+              cwd: resolvedDest,
+              stdio: options.json ? 'ignore' : 'inherit'
+            });
+          }
+        } catch (err: any) {
+          hasFailures = true;
+          if (!options.json) {
+            console.warn(chalk.yellow(`  ⚠️  Task failed: ${cmd}`));
+          }
+        }
+      }
+
+      if (hasFailures) {
+        if (!options.json) console.warn(chalk.yellow("\nWarning: Some post-config tasks failed or produced errors. Project structure is intact."));
+        if (options.strictPostConfig) {
+          process.exit(1);
+        }
       }
     }
   }

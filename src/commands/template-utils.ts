@@ -713,14 +713,22 @@ export async function promptPostConfigTasks(
 ): Promise<string[]> {
   if (tasks.length === 0) return [];
 
+  const getCmdStr = (t: PostConfigTask): string => {
+    if (typeof t.command === 'string') return t.command;
+    if (t.command && typeof t.command === 'object') {
+      return JSON.stringify(t.command);
+    }
+    return t.script ? `./${t.script}` : '';
+  };
+
   if (options.yes || options.json) {
-    return tasks.map(t => t.command || t.script || '');
+    return tasks.map(t => getCmdStr(t));
   }
 
   const choices: Array<{name: string; value: string; checked?: boolean}> = [];
 
   for (const t of tasks) {
-    const cmd = t.command || t.script || '(no command)';
+    const cmd = getCmdStr(t) || '(no command)';
     const desc = t.description ? ` (${t.description})` : '';
     choices.push({
       name: `${cmd}${desc}`,

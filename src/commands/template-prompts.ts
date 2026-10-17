@@ -304,16 +304,25 @@ export async function promptPostConfigTasks(
   tasks: PostConfigTask[],
   options: { yes?: boolean; json?: boolean; dryRun?: boolean } = {}
 ): Promise<string[]> {
-  if (tasks.length === 0) return [];
-  
-  if (options.dryRun) return tasks.map(t => t.command || `./${t.script}` || '');
-  if (options.yes || options.json) return tasks.map(t => t.command || `./${t.script}` || '');
+  const getCmdStr = (t: PostConfigTask): string => {
+    if (typeof t.command === 'string') return t.command;
+    if (t.command && typeof t.command === 'object') {
+      return JSON.stringify(t.command);
+    }
+    return t.script ? `./${t.script}` : '';
+  };
 
-  const choices = tasks.map(t => ({
-    name: `${t.command || `./${t.script}` || '(no command)'}${t.description ? ` (${t.description})` : ''}`,
-    value: t.command || `./${t.script}` || '',
-    checked: true
-  }));
+  if (options.dryRun) return tasks.map(t => getCmdStr(t));
+  if (options.yes || options.json) return tasks.map(t => getCmdStr(t));
+
+  const choices = tasks.map(t => {
+    const cmdStr = getCmdStr(t);
+    return {
+      name: `${cmdStr || '(no command)'}${t.description ? ` (${t.description})` : ''}`,
+      value: cmdStr,
+      checked: true
+    };
+  });
 
   const { selected } = await inquirer.prompt({
     type: 'checkbox',

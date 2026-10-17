@@ -381,8 +381,8 @@ export async function update(sourcePath: string, templateName: string, options: 
     if (selectedTaskNames.length > 0) {
       if (!templateConfig.post_config) templateConfig.post_config = [];
       for (const t of defaultApplicableTasks) {
-        const cmd = t.command || t.script || '';
-        if (selectedTaskNames.includes(cmd)) {
+        const cmdStr = typeof t.command === 'string' ? t.command : (t.command ? JSON.stringify(t.command) : (t.script || ''));
+        if (selectedTaskNames.includes(cmdStr)) {
           const alreadyExists = templateConfig.post_config.some(existing => existing.command === t.command && existing.script === t.script);
           if (!alreadyExists) {
             templateConfig.post_config.push(t);

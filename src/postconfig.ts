@@ -12,6 +12,7 @@ import {
   showDangerousCommandWarning,
   getSecurityPolicy,
 } from './safety.js';
+import { resolveExecutionContext, resolveTaskCommand, matchesPlatform, matchesShell } from './shell.js';
 
 export interface PostConfigOptions {
   skipPostConfig?: boolean;
@@ -41,15 +42,20 @@ export async function runPostConfig(
     return;
   }
 
-  // 1. Filter tasks by type and substitute variables
+  // 1. Filter tasks by platform, shell, type and substitute variables
+  const execContext = resolveExecutionContext();
   const applicableTasks = tasks
-    .filter(t => !t.type || t.type === projectType)
-    .map(t => ({
-      ...t,
-      command: t.command && Object.keys(variables).length > 0 ? substituteVariables(t.command, variables) : t.command,
-      description: t.description && Object.keys(variables).length > 0 ? substituteVariables(t.description, variables) : t.description,
-      script: t.script && Object.keys(variables).length > 0 ? substituteVariables(t.script, variables) : t.script,
-    }));
+    .filter(t => (!t.type || t.type === projectType) && matchesPlatform(t.platform, execContext.os) && matchesShell(t.shell, execContext.shell))
+    .map(t => {
+      const resolvedCmd = resolveTaskCommand(t, execContext);
+      return {
+        ...t,
+        command: resolvedCmd && Object.keys(variables).length > 0 ? substituteVariables(resolvedCmd, variables) : resolvedCmd,
+        description: t.description && Object.keys(variables).length > 0 ? substituteVariables(t.description, variables) : t.description,
+        script: t.script && Object.keys(variables).length > 0 ? substituteVariables(t.script, variables) : t.script,
+      };
+    })
+    .filter(t => !t.command || typeof t.command === 'string');
 
   if (applicableTasks.length === 0) {
     return;

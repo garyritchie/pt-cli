@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { loadConfig, saveConfig, PostConfigTask } from '../config.js';
+import { loadConfig, saveConfig, PostConfigTask, SupportedPlatform, SupportedShell } from '../config.js';
 
 export interface DefaultPostConfigOptions {
   set?: boolean;
@@ -18,6 +18,8 @@ function coercePostConfigTasks(data: unknown): PostConfigTask[] {
       script: typeof obj.script === 'string' ? obj.script : undefined,
       always_prompt: typeof obj.always_prompt === 'boolean' ? obj.always_prompt : undefined,
       cross_platform: typeof obj.cross_platform === 'boolean' ? obj.cross_platform : undefined,
+      platform: typeof obj.platform === 'string' ? (obj.platform as SupportedPlatform) : undefined,
+      shell: typeof obj.shell === 'string' ? (obj.shell as SupportedShell) : undefined,
     };
     // Coerce checked: accept boolean, "true"/"false" strings, or omit (defaults to true in getDefaultPostConfig)
     if (typeof obj.checked === 'boolean') {
